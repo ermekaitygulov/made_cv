@@ -9,6 +9,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
+
 import torchvision.models as models
 import tqdm
 from torch.nn import functional as fnn
@@ -20,8 +22,8 @@ from utils import ScaleMinSideToSize, CropCenter, TransformByKeys
 from utils import ThousandLandmarksDataset
 from utils import restore_landmarks_batch, create_submission
 
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
 
 
 def parse_arguments():
@@ -36,36 +38,40 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def train(model, loader, loss_fn, optimizer, device):
+def train(model, loader, loss_fn, optimizer, device, writer):
     model.train()
     train_loss = []
-    for batch in tqdm.tqdm(loader, total=len(loader), desc="training..."):
+    for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="training...")):
         images = batch["image"].to(device)  # B x 3 x CROP_SIZE x CROP_SIZE
-        landmarks = batch["landmarks"]  # B x (2 * NUM_PTS)
+        landmarks = batch["landmarks"].to(device)  # B x (2 * NUM_PTS)
 
-        pred_landmarks = model(images).cpu()  # B x (2 * NUM_PTS)
+        pred_landmarks = model(images)  # B x (2 * NUM_PTS)
         loss = loss_fn(pred_landmarks, landmarks, reduction="mean")
         train_loss.append(loss.item())
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
+        if (i + 1) % 10 == 0:
+            writer.add_scalar('train loss', np.mean(train_loss[-10:]), i)
+            writer.flush()
     return np.mean(train_loss)
 
 
-def validate(model, loader, loss_fn, device):
+def validate(model, loader, loss_fn, device, writer):
     model.eval()
     val_loss = []
-    for batch in tqdm.tqdm(loader, total=len(loader), desc="validation..."):
+    for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="validation...")):
         images = batch["image"].to(device)
-        landmarks = batch["landmarks"]
+        landmarks = batch["landmarks"].to(device)
 
         with torch.no_grad():
-            pred_landmarks = model(images).cpu()
+            pred_landmarks = model(images)
         loss = loss_fn(pred_landmarks, landmarks, reduction="mean")
         val_loss.append(loss.item())
-
+        if (i + 1) % 10 == 0:
+            writer.add_scalar('val loss', np.mean(val_loss[-10:]), i)
+            writer.flush()
     return np.mean(val_loss)
 
 
@@ -121,13 +127,14 @@ def main(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss
+    writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
 
     # 2. train & validate
     print("Ready for training...")
     best_val_loss = np.inf
     for epoch in range(args.epochs):
-        train_loss = train(model, train_dataloader, loss_fn, optimizer, device=device)
-        val_loss = validate(model, val_dataloader, loss_fn, device=device)
+        train_loss = train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer)
+        val_loss = validate(model, val_dataloader, loss_fn, device=device, writer=writer)
         print("Epoch #{:2}:\ttrain loss: {:5.2}\tval loss: {:5.2}".format(epoch, train_loss, val_loss))
         if val_loss < best_val_loss:
             best_val_loss = val_loss
