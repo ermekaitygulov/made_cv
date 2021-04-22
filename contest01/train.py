@@ -17,6 +17,7 @@ from torch.nn import functional as fnn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+from models import MyResNet
 from utils import NUM_PTS, CROP_SIZE
 from utils import ScaleMinSideToSize, CropCenter, TransformByKeys
 from utils import ThousandLandmarksDataset
@@ -94,6 +95,12 @@ def predict(model, loader, device):
     return predictions
 
 
+def init_model():
+    print("Creating model...")
+    model = MyResNet(CROP_SIZE, 2 * NUM_PTS)
+    return model
+
+
 def main(args):
     os.makedirs("runs", exist_ok=True)
 
@@ -115,14 +122,7 @@ def main(args):
                                 shuffle=False, drop_last=False)
 
     device = torch.device("cuda:0") if args.gpu and torch.cuda.is_available() else torch.device("cpu")
-
-    print("Creating model...")
-    model = models.resnet18(pretrained=True)
-    model.requires_grad_(False)
-
-    model.fc = nn.Linear(model.fc.in_features, 2 * NUM_PTS, bias=True)
-    model.fc.requires_grad_(True)
-
+    model = init_model()
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
