@@ -102,7 +102,6 @@ class ThousandLandmarksDataset(data.Dataset):
         with open(landmark_file_name, "rt") as fp:
             num_lines = sum(1 for _ in fp)
         num_lines -= 1  # header
-        num_lines -= len(bad_img_names)
 
         with open(landmark_file_name, "rt") as fp:
             for i, line in tqdm.tqdm(enumerate(fp), total=num_lines + 1):

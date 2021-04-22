@@ -11,10 +11,12 @@ class MyResNet(nn.Module):
 
         fc_input = 512 * 4 ** 2
         s1_input = 256 * 4 ** 2
-        self.model.fc = nn.Linear(fc_input + s1_input, output_size, bias=True)
+        s2_input = 128 * 8 ** 2
+        self.model.fc = nn.Linear(fc_input + s1_input + s2_input, output_size, bias=True)
         self.model.fc.requires_grad_(True)
         self.model.layer4.requires_grad_(True)
         self.avg_pool1 = nn.AdaptiveAvgPool2d((4, 4))
+        self.avg_pool2 = nn.AdaptiveAvgPool2d((8, 8))
 
     def forward(self, x):
         x = self.model.conv1(x)
@@ -24,12 +26,14 @@ class MyResNet(nn.Module):
 
         x = self.model.layer1(x)
         x = self.model.layer2(x)
+        s2 = self.avg_pool2(x)
         x = self.model.layer3(x)
         s1 = self.avg_pool1(x)
         x = self.model.layer4(x)
 
         x = torch.flatten(x, 1)
         s1 = torch.flatten(s1, 1)
-        x = torch.cat([x, s1], 1)
+        s2 = torch.flatten(s2, 1)
+        x = torch.cat([x, s1, s2], 1)
         x = self.model.fc(x)
         return x
