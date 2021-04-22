@@ -39,7 +39,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def train(model, loader, loss_fn, optimizer, device, writer):
+def train(model, loader, loss_fn, optimizer, device, writer, epoch):
     model.train()
     train_loss = []
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="training...")):
@@ -54,12 +54,12 @@ def train(model, loader, loss_fn, optimizer, device, writer):
         loss.backward()
         optimizer.step()
         if (i + 1) % 10 == 0:
-            writer.add_scalar('train loss', np.mean(train_loss[-10:]), i)
+            writer.add_scalar('train loss', np.mean(train_loss[-10:]), i + epoch * len(loader))
             writer.flush()
     return np.mean(train_loss)
 
 
-def validate(model, loader, loss_fn, device, writer):
+def validate(model, loader, loss_fn, device, writer, epoch):
     model.eval()
     val_loss = []
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="validation...")):
@@ -71,7 +71,7 @@ def validate(model, loader, loss_fn, device, writer):
         loss = loss_fn(pred_landmarks, landmarks, reduction="mean")
         val_loss.append(loss.item())
         if (i + 1) % 10 == 0:
-            writer.add_scalar('val loss', np.mean(val_loss[-10:]), i)
+            writer.add_scalar('val loss', np.mean(val_loss[-10:]), i + epoch * len(loader))
             writer.flush()
     return np.mean(val_loss)
 
@@ -97,7 +97,7 @@ def predict(model, loader, device):
 
 def init_model():
     print("Creating model...")
-    model = MyResNet(CROP_SIZE, 2 * NUM_PTS)
+    model = MyResNet(2 * NUM_PTS)
     return model
 
 
@@ -114,10 +114,15 @@ def main(args):
     ])
 
     print("Reading data...")
-    train_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="train")
+    with open('bad_images.bd') as fin:
+        bad_img_names = fin.readlines()
+        bad_img_names = [i.strip() for i in bad_img_names]
+    train_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="train",
+                                             bad_img_names=bad_img_names)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True,
                                   shuffle=True, drop_last=True)
-    val_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="val")
+    val_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="val",
+                                           bad_img_names=bad_img_names)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True,
                                 shuffle=False, drop_last=False)
 
@@ -133,8 +138,8 @@ def main(args):
     print("Ready for training...")
     best_val_loss = np.inf
     for epoch in range(args.epochs):
-        train_loss = train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer)
-        val_loss = validate(model, val_dataloader, loss_fn, device=device, writer=writer)
+        train_loss = train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch)
+        val_loss = validate(model, val_dataloader, loss_fn, device=device, writer=writer, epoch=epoch)
         print("Epoch #{:2}:\ttrain loss: {:5.2}\tval loss: {:5.2}".format(epoch, train_loss, val_loss))
         if val_loss < best_val_loss:
             best_val_loss = val_loss
