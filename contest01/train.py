@@ -34,6 +34,7 @@ def parse_arguments():
     parser.add_argument("--epochs", "-e", default=1, type=int)
     parser.add_argument("--learning-rate", "-lr", default=1e-3, type=float)
     parser.add_argument("--gpu", action="store_true")
+    parser.add_argument("--model_path", "-m", help="Path to model.", default=None)
     return parser.parse_args()
 
 
@@ -86,7 +87,7 @@ def predict(model, loader, device):
             pred_landmarks = model(images).cpu()
         pred_landmarks = pred_landmarks.numpy().reshape((len(pred_landmarks), NUM_PTS, 2))  # B x NUM_PTS x 2
 
-        original_shapes = batch['original_shape'].numpy()
+        original_shapes = np.array(batch['original_shape'])
         prediction = restore_landmarks_batch(pred_landmarks, original_shapes, CROP_SIZE)  # B x NUM_PTS x 2
         predictions[i * loader.batch_size: (i + 1) * loader.batch_size] = prediction
 
@@ -117,6 +118,7 @@ def main(args):
     test_transforms = A.Compose([
         A.SmallestMaxSize(128),
         A.CenterCrop(128, 128),
+        A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
         ToTensorV3()
     ])
 
@@ -136,6 +138,10 @@ def main(args):
     device = torch.device("cuda:0") if args.gpu and torch.cuda.is_available() else torch.device("cpu")
     model = init_model()
     model.to(device)
+    if args.model_path:
+        with open(args.model_path, "rb") as fp:
+            state_dict = torch.load(fp, map_location="cpu")
+            model.load_state_dict(state_dict)
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss

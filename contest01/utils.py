@@ -80,16 +80,17 @@ class ThousandLandmarksDataset(data.Dataset):
         image = cv2.imread(self.image_names[idx])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         sample["image_name"] = self.image_names[idx]
-        sample['original_shape'] = image.shape
+        sample['original_shape'] = np.array(image.shape)
 
         if self.transforms is not None:
             to_transform["image"] = image
             transformed = self.transforms(**to_transform)
             assert transformed['image'].shape == (3, CROP_SIZE, CROP_SIZE), (transformed['image'].shape,
                                                                              self.image_names[idx])
-            transformed['landmarks'] = transformed.pop('keypoints')
-            assert transformed['landmarks'].shape == (NUM_PTS, 2), (transformed['landmarks'].shape,
-                                                                    self.image_names[idx])
+            if 'keypoints' in transformed:
+                transformed['landmarks'] = transformed.pop('keypoints')
+                assert transformed['landmarks'].shape == (NUM_PTS, 2), (transformed['landmarks'].shape,
+                                                                        self.image_names[idx])
             sample.update(transformed)
         else:
             sample['image'] = image
@@ -110,7 +111,7 @@ def restore_landmarks(landmarks, f, margins):
 
 def restore_landmarks_batch(landmarks, original_shapes, crop_size=128):
     fs = compute_fs(original_shapes, crop_size)
-    margins_x, margins_y = compute_margins(original_shapes * fs, crop_size)
+    margins_x, margins_y = compute_margins(original_shapes * fs[:, None], crop_size)
 
     landmarks[:, :, 0] += margins_x[:, None]
     landmarks[:, :, 1] += margins_y[:, None]
