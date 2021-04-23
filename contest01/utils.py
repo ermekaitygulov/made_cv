@@ -7,12 +7,12 @@ import torch
 import tqdm
 from torch.utils import data
 
+from transforms import NUM_PTS, CROP_SIZE
+
 np.random.seed(1234)
 torch.manual_seed(1234)
 
 TRAIN_SIZE = 0.8
-NUM_PTS = 971
-CROP_SIZE = 128
 SUBMISSION_HEADER = "file_name,Point_M0_X,Point_M0_Y,Point_M1_X,Point_M1_Y," \
                     "Point_M2_X,Point_M2_Y,Point_M3_X,Point_M3_Y,Point_M4_X," \
                     "Point_M4_Y,Point_M5_X,Point_M5_Y,Point_M6_X,Point_M6_Y," \
@@ -26,65 +26,6 @@ SUBMISSION_HEADER = "file_name,Point_M0_X,Point_M0_Y,Point_M1_X,Point_M1_Y," \
                     "Point_M24_Y,Point_M25_X,Point_M25_Y,Point_M26_X,Point_M26_Y," \
                     "Point_M27_X,Point_M27_Y,Point_M28_X,Point_M28_Y,Point_M29_X," \
                     "Point_M29_Y\n"
-
-
-class ScaleMinSideToSize(object):
-    def __init__(self, size=(CROP_SIZE, CROP_SIZE), elem_name='image'):
-        # self.size = torch.tensor(size, dtype=torch.float)
-        self.size = np.asarray(size, dtype=np.float)
-        self.elem_name = elem_name
-
-    def __call__(self, sample):
-        h, w, _ = sample[self.elem_name].shape
-        if h > w:
-            f = self.size[0] / w
-        else:
-            f = self.size[1] / h
-
-        sample[self.elem_name] = cv2.resize(sample[self.elem_name], None, fx=f, fy=f, interpolation=cv2.INTER_AREA)
-        sample["scale_coef"] = f
-
-        if 'landmarks' in sample:
-            landmarks = sample['landmarks'].reshape(-1, 2).float()
-            landmarks = landmarks * f
-            sample['landmarks'] = landmarks.reshape(-1)
-
-        return sample
-
-
-class CropCenter(object):
-    def __init__(self, size=128, elem_name='image'):
-        self.size = size
-        self.elem_name = elem_name
-
-    def __call__(self, sample):
-        img = sample[self.elem_name]
-        h, w, _ = img.shape
-        margin_h = (h - self.size) // 2
-        margin_w = (w - self.size) // 2
-        sample[self.elem_name] = img[margin_h:margin_h + self.size, margin_w:margin_w + self.size]
-        sample["crop_margin_x"] = margin_w
-        sample["crop_margin_y"] = margin_h
-
-        if 'landmarks' in sample:
-            landmarks = sample['landmarks'].reshape(-1, 2)
-            landmarks -= torch.tensor((margin_w, margin_h), dtype=landmarks.dtype)[None, :]
-            sample['landmarks'] = landmarks.reshape(-1)
-
-        return sample
-
-
-class TransformByKeys(object):
-    def __init__(self, transform, names):
-        self.transform = transform
-        self.names = set(names)
-
-    def __call__(self, sample):
-        for name in self.names:
-            if name in sample:
-                sample[name] = self.transform(sample[name])
-
-        return sample
 
 
 class ThousandLandmarksDataset(data.Dataset):
@@ -131,16 +72,27 @@ class ThousandLandmarksDataset(data.Dataset):
 
     def __getitem__(self, idx):
         sample = {}
+        to_transform = {}
         if self.landmarks is not None:
             landmarks = self.landmarks[idx]
-            sample["landmarks"] = landmarks
+            to_transform["keypoints"] = landmarks
 
         image = cv2.imread(self.image_names[idx])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        sample["image"] = image
         sample["image_name"] = self.image_names[idx]
+        sample['original_shape'] = image.shape
+
         if self.transforms is not None:
-            sample = self.transforms(sample)
+            to_transform["image"] = image
+            transformed = self.transforms(**to_transform)
+            assert transformed['image'].shape == (3, CROP_SIZE, CROP_SIZE), (transformed['image'].shape,
+                                                                             self.image_names[idx])
+            transformed['landmarks'] = transformed.pop('keypoints')
+            assert transformed['landmarks'].shape == (NUM_PTS, 2), (transformed['landmarks'].shape,
+                                                                    self.image_names[idx])
+            sample.update(transformed)
+        else:
+            sample['image'] = image
 
         return sample
 
@@ -156,11 +108,26 @@ def restore_landmarks(landmarks, f, margins):
     return landmarks
 
 
-def restore_landmarks_batch(landmarks, fs, margins_x, margins_y):
+def restore_landmarks_batch(landmarks, original_shapes, crop_size=128):
+    fs = compute_fs(original_shapes, crop_size)
+    margins_x, margins_y = compute_margins(original_shapes * fs, crop_size)
+
     landmarks[:, :, 0] += margins_x[:, None]
     landmarks[:, :, 1] += margins_y[:, None]
     landmarks /= fs[:, None, None]
     return landmarks
+
+
+def compute_margins(original_shape, crop_size=128):
+    margins_x = (original_shape[:, 1] - crop_size) // 2
+    margins_y = (original_shape[:, 0] - crop_size) // 2
+    return margins_x, margins_y
+
+
+def compute_fs(original_shape, crop_size=128):
+    min_side = np.min(original_shape[:, :2], axis=1)
+    fs = crop_size / min_side
+    return fs
 
 
 def create_submission(path_to_data, test_predictions, path_to_submission_file):

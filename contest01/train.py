@@ -6,22 +6,20 @@ import sys
 from argparse import ArgumentParser
 
 import numpy as np
+import cv2
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-import torchvision.models as models
 import tqdm
 from torch.nn import functional as fnn
 from torch.utils.data import DataLoader
-from torchvision import transforms
 
 from models import MyResNet
-from utils import NUM_PTS, CROP_SIZE
-from utils import ScaleMinSideToSize, CropCenter, TransformByKeys
+from transforms import NUM_PTS, CROP_SIZE, FaceHorizontalFlip, ToTensorV3
 from utils import ThousandLandmarksDataset
 from utils import restore_landmarks_batch, create_submission
+import albumentations as A
 
 # torch.backends.cudnn.deterministic = True
 # torch.backends.cudnn.benchmark = False
@@ -45,6 +43,7 @@ def train(model, loader, loss_fn, optimizer, device, writer, epoch):
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="training...")):
         images = batch["image"].to(device)  # B x 3 x CROP_SIZE x CROP_SIZE
         landmarks = batch["landmarks"].to(device)  # B x (2 * NUM_PTS)
+        landmarks = landmarks.view(landmarks.shape[0], -1)
 
         pred_landmarks = model(images)  # B x (2 * NUM_PTS)
         loss = loss_fn(pred_landmarks, landmarks, reduction="mean")
@@ -65,6 +64,7 @@ def validate(model, loader, loss_fn, device, writer, epoch):
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="validation...")):
         images = batch["image"].to(device)
         landmarks = batch["landmarks"].to(device)
+        landmarks = landmarks.view(landmarks.shape[0], -1)
 
         with torch.no_grad():
             pred_landmarks = model(images)
@@ -86,10 +86,8 @@ def predict(model, loader, device):
             pred_landmarks = model(images).cpu()
         pred_landmarks = pred_landmarks.numpy().reshape((len(pred_landmarks), NUM_PTS, 2))  # B x NUM_PTS x 2
 
-        fs = batch["scale_coef"].numpy()  # B
-        margins_x = batch["crop_margin_x"].numpy()  # B
-        margins_y = batch["crop_margin_y"].numpy()  # B
-        prediction = restore_landmarks_batch(pred_landmarks, fs, margins_x, margins_y)  # B x NUM_PTS x 2
+        original_shapes = batch['original_shape'].numpy()
+        prediction = restore_landmarks_batch(pred_landmarks, original_shapes, CROP_SIZE)  # B x NUM_PTS x 2
         predictions[i * loader.batch_size: (i + 1) * loader.batch_size] = prediction
 
     return predictions
@@ -105,12 +103,21 @@ def main(args):
     os.makedirs("runs", exist_ok=True)
 
     # 1. prepare data & models
-    train_transforms = transforms.Compose([
-        ScaleMinSideToSize((CROP_SIZE, CROP_SIZE)),
-        CropCenter(CROP_SIZE),
-        TransformByKeys(transforms.ToPILImage(), ("image",)),
-        TransformByKeys(transforms.ToTensor(), ("image",)),
-        TransformByKeys(transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]), ("image",)),
+    train_transforms = A.Compose([
+        A.RandomBrightness(limit=0.2, p=0.5),
+        A.RandomContrast(limit=0.2, p=0.5),
+        A.Blur(blur_limit=3, p=0.5),
+        A.SmallestMaxSize(128),
+        A.CenterCrop(128, 128),
+        FaceHorizontalFlip(p=0.5),
+        A.Rotate(border_mode=cv2.BORDER_CONSTANT, limit=20, p=0.8),
+        A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
+        ToTensorV3()
+    ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
+    test_transforms = A.Compose([
+        A.SmallestMaxSize(128),
+        A.CenterCrop(128, 128),
+        ToTensorV3()
     ])
 
     print("Reading data...")
@@ -119,11 +126,11 @@ def main(args):
         bad_img_names = [i.strip() for i in bad_img_names]
     train_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="train",
                                              bad_img_names=bad_img_names)
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True,
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True,
                                   shuffle=True, drop_last=True)
     val_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="val",
                                            bad_img_names=bad_img_names)
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True,
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True,
                                 shuffle=False, drop_last=False)
 
     device = torch.device("cuda:0") if args.gpu and torch.cuda.is_available() else torch.device("cpu")
@@ -147,7 +154,7 @@ def main(args):
                 torch.save(model.state_dict(), fp)
 
     # 3. predict
-    test_dataset = ThousandLandmarksDataset(os.path.join(args.data, "test"), train_transforms, split="test")
+    test_dataset = ThousandLandmarksDataset(os.path.join(args.data, "test"), test_transforms, split="test")
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True,
                                  shuffle=False, drop_last=False)
 
