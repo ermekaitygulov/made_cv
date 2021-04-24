@@ -6,7 +6,6 @@ import sys
 from argparse import ArgumentParser
 
 import numpy as np
-import cv2
 import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
@@ -15,8 +14,8 @@ import tqdm
 from torch.nn import functional as fnn
 from torch.utils.data import DataLoader
 
-from models import MyResNet
-from transforms import NUM_PTS, CROP_SIZE, FaceHorizontalFlip, ToTensorV3
+from models import CATALOG
+from transforms import NUM_PTS, CROP_SIZE, ToTensorV3
 from utils import ThousandLandmarksDataset
 from utils import restore_landmarks_batch, create_submission
 import albumentations as A
@@ -34,7 +33,8 @@ def parse_arguments():
     parser.add_argument("--epochs", "-e", default=1, type=int)
     parser.add_argument("--learning-rate", "-lr", default=1e-3, type=float)
     parser.add_argument("--gpu", action="store_true")
-    parser.add_argument("--model_path", "-m", help="Path to model.", default=None)
+    parser.add_argument("--model_name", help="Model from catalog.", default='resnet')
+    parser.add_argument("--model_path", help="Path to model.", default=None)
     return parser.parse_args()
 
 
@@ -96,9 +96,9 @@ def predict(model, loader, device):
     return predictions
 
 
-def init_model():
+def init_model(args):
     print("Creating model...")
-    model = MyResNet(2 * NUM_PTS)
+    model = CATALOG[args.model_name](2 * NUM_PTS)
     return model
 
 
@@ -107,9 +107,9 @@ def main(args):
 
     # 1. prepare data & models
     train_transforms = A.Compose([
-        A.RandomBrightness(limit=0.2, p=0.5),
-        A.RandomContrast(limit=0.2, p=0.5),
-        A.Blur(blur_limit=3, p=0.5),
+        # A.RandomBrightness(limit=0.2, p=0.1),
+        # A.RandomContrast(limit=0.2, p=0.1),
+        # A.Blur(blur_limit=3, p=0.1),
         A.SmallestMaxSize(128),
         A.CenterCrop(128, 128),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -136,7 +136,7 @@ def main(args):
                                 shuffle=False, drop_last=False)
 
     device = torch.device("cuda:0") if args.gpu and torch.cuda.is_available() else torch.device("cpu")
-    model = init_model()
+    model = init_model(args)
     model.to(device)
     if args.model_path:
         with open(args.model_path, "rb") as fp:
@@ -145,6 +145,7 @@ def main(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 10, gamma=0.5)
     writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
 
     # 2. train & validate
@@ -153,6 +154,9 @@ def main(args):
     for epoch in range(args.epochs):
         train_loss = train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch)
         val_loss = validate(model, val_dataloader, loss_fn, device=device, writer=writer, epoch=epoch)
+        scheduler.step()
+        writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
+        writer.flush()
         print("Epoch #{:2}:\ttrain loss: {:5.2}\tval loss: {:5.2}".format(epoch, train_loss, val_loss))
         if val_loss < best_val_loss:
             best_val_loss = val_loss
