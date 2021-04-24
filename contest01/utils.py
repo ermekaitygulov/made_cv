@@ -74,7 +74,9 @@ class ThousandLandmarksDataset(data.Dataset):
         sample = {}
         to_transform = {}
         if self.landmarks is not None:
-            landmarks = self.landmarks[idx]
+            landmarks = np.array(self.landmarks[idx], dtype='float32')
+            torch_landmarks = torch.from_numpy(landmarks)
+            sample["original_landmarks"] = torch_landmarks
             to_transform["keypoints"] = landmarks
 
         image = cv2.imread(self.image_names[idx])
@@ -126,7 +128,10 @@ def compute_margins(original_shape, crop_size=128):
 
 
 def compute_fs(original_shape, crop_size=128):
-    min_side = np.min(original_shape[:, :2], axis=1)
+    if isinstance(original_shape, torch.Tensor):
+        min_side = torch.min(original_shape[:, :2], dim=1)[0]
+    else:
+        min_side = np.min(original_shape[:, :2], axis=1)
     fs = crop_size / min_side
     return fs
 

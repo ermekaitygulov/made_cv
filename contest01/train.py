@@ -64,11 +64,13 @@ def validate(model, loader, loss_fn, device, writer, epoch):
     val_loss = []
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="validation...")):
         images = batch["image"].to(device)
-        landmarks = batch["landmarks"].to(device)
+        landmarks = batch["original_landmarks"]
         landmarks = landmarks.view(landmarks.shape[0], -1)
+        original_shapes = batch['original_shape']
 
         with torch.no_grad():
-            pred_landmarks = model(images)
+            pred_landmarks = model(images).to('cpu').view(-1, NUM_PTS, 2)
+        pred_landmarks = restore_landmarks_batch(pred_landmarks, original_shapes, CROP_SIZE).view(-1, NUM_PTS * 2)
         loss = loss_fn(pred_landmarks, landmarks, reduction="mean")
         val_loss.append(loss.item())
         if (i + 1) % 10 == 0:
@@ -110,15 +112,13 @@ def main(args):
         A.Blur(blur_limit=3, p=0.5),
         A.SmallestMaxSize(128),
         A.CenterCrop(128, 128),
-        FaceHorizontalFlip(p=0.5),
-        A.Rotate(border_mode=cv2.BORDER_CONSTANT, limit=20, p=0.8),
-        A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV3()
     ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
     test_transforms = A.Compose([
         A.SmallestMaxSize(128),
         A.CenterCrop(128, 128),
-        A.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV3()
     ])
 
