@@ -110,14 +110,14 @@ def main(args):
         # A.RandomBrightness(limit=0.2, p=0.1),
         # A.RandomContrast(limit=0.2, p=0.1),
         # A.Blur(blur_limit=3, p=0.1),
-        A.SmallestMaxSize(128),
-        A.CenterCrop(128, 128),
+        A.SmallestMaxSize(CROP_SIZE),
+        A.CenterCrop(CROP_SIZE, CROP_SIZE),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV3()
     ], keypoint_params=A.KeypointParams(format='xy', remove_invisible=False))
     test_transforms = A.Compose([
-        A.SmallestMaxSize(128),
-        A.CenterCrop(128, 128),
+        A.SmallestMaxSize(CROP_SIZE),
+        A.CenterCrop(CROP_SIZE, CROP_SIZE),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV3()
     ])
@@ -145,7 +145,7 @@ def main(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 10, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 6, gamma=0.8)
     writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
 
     # 2. train & validate

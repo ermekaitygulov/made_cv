@@ -4,7 +4,7 @@ from albumentations.pytorch import ToTensorV2
 import torch
 
 NUM_PTS = 971
-CROP_SIZE = 128
+CROP_SIZE = 224
 
 
 class FaceHorizontalFlip(A.HorizontalFlip):

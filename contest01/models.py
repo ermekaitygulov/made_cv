@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch
 from torchvision import ops
 
+from transforms import CROP_SIZE
+
 CATALOG = {}
 
 
@@ -14,13 +16,13 @@ def add_to_catalog(name):
 
 
 @add_to_catalog('resnet')
-class MyResNet(nn.Module):
+class AvgResNet(nn.Module):
     def __init__(self, output_size):
-        super(MyResNet, self).__init__()
-        self.model = models.resnet18(pretrained=True)
+        super(AvgResNet, self).__init__()
+        self.model = models.resnet34(pretrained=True)
         self.model.requires_grad_(False)
 
-        fc_input = 512 * 4 ** 2
+        fc_input = 512 * (CROP_SIZE // 32) ** 2
         s1_input = 256 * 4 ** 2
         s2_input = 128 * 8 ** 2
         self.model.fc = nn.Linear(fc_input + s1_input + s2_input, output_size, bias=True)
@@ -47,23 +49,29 @@ class MyResNet(nn.Module):
         x3 = torch.flatten(x3, 1)
         x2 = self.avg_pool2(x2)
         x2 = torch.flatten(x2, 1)
+
         out = torch.cat([x4, x3, x2], 1)
         out = self.model.fc(out)
         return out
 
 
-@add_to_catalog('resnetv2')
-class MyResNetV2(nn.Module):
+@add_to_catalog('resnetv3')
+class CnnResNet(nn.Module):
     def __init__(self, output_size):
-        super(MyResNetV2, self).__init__()
-        self.model = models.resnet18(pretrained=True)
+        super(CnnResNet, self).__init__()
+        self.model = models.resnet34(pretrained=True)
         self.model.requires_grad_(False)
 
         fc_input = 512 * 4 ** 2
-        s1_input = 256 * 8 ** 2
-        self.model.fc = nn.Linear(fc_input + s1_input, output_size, bias=True)
+        s1_input = 64 * 8 ** 2
+        s2_input = 32 * 16 ** 2
+        self.model.fc = nn.Linear(fc_input + s1_input + s2_input, output_size, bias=True)
         self.model.fc.requires_grad_(True)
-        self.model.layer4.requires_grad_(True)
+        # self.model.layer4.requires_grad_(True)
+        # self.model.layer3.requires_grad_(True)
+        # self.model.layer2.requires_grad_(True)
+        self.x3_bottleneck = nn.Conv2d(256, 64, (1, 1))
+        self.x4_bottleneck = nn.Conv2d(128, 32, (1, 1))
 
     def forward(self, x):
         x = self.model.conv1(x)
@@ -77,65 +85,11 @@ class MyResNetV2(nn.Module):
         x4 = self.model.layer4(x3)
 
         x4 = torch.flatten(x4, 1)
+        x3 = self.x3_bottleneck(x3)
         x3 = torch.flatten(x3, 1)
-        out = torch.cat([x4, x3], 1)
+        x2 = self.x4_bottleneck(x2)
+        x2 = torch.flatten(x2, 1)
+        out = torch.cat([x4, x3, x2], 1)
         out = self.model.fc(out)
         return out
 
-
-class PyramidFeatures(nn.Module):
-
-    def __init__(self, C3_size, C4_size, C5_size, feature_size=256):
-        """
-        FPN constructor.
-
-        Args:
-            - C3_size: num features in C3 map.
-            - C4_size: num features in C4 map.
-            - C5_size: num features in C5 map.
-            - feature_size: num features in output maps.
-        """
-        super(PyramidFeatures, self).__init__()
-
-        # For P5
-        self.P5_1 = nn.Conv2d(C5_size, feature_size, kernel_size=(1, 1))
-        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
-        self.P5_2 = nn.Conv2d(feature_size, feature_size, kernel_size=(3, 3), padding=(1, 1))
-
-        # For P4
-        self.P4_1 = nn.Conv2d(C4_size, feature_size, kernel_size=(1, 1))
-        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
-        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=(3, 3), padding=(1, 1))
-
-        # For P3
-        self.P3_1 = nn.Conv2d(C3_size, feature_size, kernel_size=(1, 1))
-        self.P3_2 = nn.Conv2d(feature_size, feature_size, kernel_size=(3, 3), padding=(1, 1))
-
-    def forward(self, inputs):
-        """
-        Method for "__call__".
-
-        Args:
-            - inputs: List of C3, C4, C5 activation maps from backbone.
-
-        Returns:
-            List of pyramid feature maps from P3 to P7.
-        """
-        C3, C4, C5 = inputs
-
-        P5_x = self.P5_1(C5)
-        P5_upsampled_x = self.P5_upsampled(P5_x)
-        P5_x = self.P5_2(P5_x)
-
-        P4_x = self.P4_1(C4)
-        P4_x = P5_upsampled_x + P4_x
-        P4_upsampled_x = self.P4_upsampled(P4_x)
-        P4_x = self.P4_2(P4_x)
-
-
-        P3_x = self.P3_1(C3)
-        P3_x = P4_upsampled_x + P3_x
-        P3_x = self.P3_2(P3_x)
-
-
-        return P3_x, P4_x, P5_x
