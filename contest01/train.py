@@ -134,7 +134,7 @@ def init_model(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 4, 1e-6),
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 4, 1e-6)
     writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
     return model, optimizer, loss_fn, scheduler, writer, device
 
