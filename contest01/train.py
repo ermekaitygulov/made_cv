@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from models import CATALOG
 from transforms import NUM_PTS, CROP_SIZE, ToTensorV3
 from utils import ThousandLandmarksDataset
-from utils import restore_landmarks_batch, create_submission
+from utils import restore_landmarks_batch, create_submission, log_val_loss, log_shapes_loss, print_val_result
 import albumentations as A
 
 # torch.backends.cudnn.deterministic = True
@@ -35,6 +35,7 @@ def parse_arguments():
     parser.add_argument("--gpu", action="store_true")
     parser.add_argument("--model_name", help="Model from catalog.", default='resnet')
     parser.add_argument("--model_path", help="Path to model.", default=None)
+    parser.add_argument("--evaluate_only", help="Evaluate only.", action='store_true')
     return parser.parse_args()
 
 
@@ -56,12 +57,14 @@ def train(model, loader, loss_fn, optimizer, device, writer, epoch):
         if (i + 1) % 10 == 0:
             writer.add_scalar('train loss', np.mean(train_loss[-10:]), i + epoch * len(loader))
             writer.flush()
-    return np.mean(train_loss)
+    train_loss = np.mean(train_loss)
+    print(f"Train loss: {train_loss:5.2}")
 
 
-def validate(model, loader, loss_fn, device, writer, epoch):
+def validate(model, loader, loss_fn, device, writer, epoch, best_val_loss=None):
     model.eval()
     val_loss = []
+    shapes = []
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="validation...")):
         images = batch["image"].to(device)
         landmarks = batch["original_landmarks"]
@@ -71,12 +74,20 @@ def validate(model, loader, loss_fn, device, writer, epoch):
         with torch.no_grad():
             pred_landmarks = model(images).to('cpu').view(-1, NUM_PTS, 2)
         pred_landmarks = restore_landmarks_batch(pred_landmarks, original_shapes, CROP_SIZE).view(-1, NUM_PTS * 2)
-        loss = loss_fn(pred_landmarks, landmarks, reduction="mean")
-        val_loss.append(loss.item())
+        loss = loss_fn(pred_landmarks, landmarks, reduction="none").numpy()
+
+        val_loss.append(loss)
+        shapes.append(original_shapes.numpy())
         if (i + 1) % 10 == 0:
-            writer.add_scalar('val loss', np.mean(val_loss[-10:]), i + epoch * len(loader))
+            log_val_loss(val_loss[-10:], i + epoch * len(loader), writer)
+            log_shapes_loss(val_loss[-10:], shapes[-10:], i + epoch * len(loader), writer)
             writer.flush()
-    return np.mean(val_loss)
+    print_val_result(val_loss, shapes)
+    if best_val_loss and np.concatenate(val_loss).mean() < best_val_loss:
+        best_val_loss = val_loss
+        with open(os.path.join("runs", f"{args.name}_best.pth"), "wb") as fp:
+            torch.save(model.state_dict(), fp)
+    return best_val_loss
 
 
 def predict(model, loader, device):
@@ -96,10 +107,36 @@ def predict(model, loader, device):
     return predictions
 
 
+def prepare_data(args, transforms, split, **dataloader_kwargs):
+    with open('bad_images.bd') as fin:
+        bad_img_names = fin.readlines()
+        bad_img_names = [i.strip() for i in bad_img_names]
+    if split in ['train', 'val']:
+        path = os.path.join(args.data, "train")
+    else:
+        path = os.path.join(args.data, "test")
+    dataset = ThousandLandmarksDataset(path, transforms, split=split,
+                                       bad_img_names=bad_img_names)
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True,
+                            **dataloader_kwargs)
+    return dataloader
+
+
 def init_model(args):
     print("Creating model...")
     model = CATALOG[args.model_name](2 * NUM_PTS)
-    return model
+    device = torch.device("cuda:0") if args.gpu and torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+    if args.model_path:
+        with open(args.model_path, "rb") as fp:
+            state_dict = torch.load(fp, map_location="cpu")
+            model.load_state_dict(state_dict)
+
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
+    loss_fn = fnn.mse_loss
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 6, gamma=0.8)
+    writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
+    return model, optimizer, loss_fn, scheduler, writer, device
 
 
 def main(args):
@@ -107,9 +144,6 @@ def main(args):
 
     # 1. prepare data & models
     train_transforms = A.Compose([
-        # A.RandomBrightness(limit=0.2, p=0.1),
-        # A.RandomContrast(limit=0.2, p=0.1),
-        # A.Blur(blur_limit=3, p=0.1),
         A.SmallestMaxSize(CROP_SIZE),
         A.CenterCrop(CROP_SIZE, CROP_SIZE),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -123,50 +157,31 @@ def main(args):
     ])
 
     print("Reading data...")
-    with open('bad_images.bd') as fin:
-        bad_img_names = fin.readlines()
-        bad_img_names = [i.strip() for i in bad_img_names]
-    train_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="train",
-                                             bad_img_names=bad_img_names)
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True,
-                                  shuffle=True, drop_last=True)
-    val_dataset = ThousandLandmarksDataset(os.path.join(args.data, "train"), train_transforms, split="val",
-                                           bad_img_names=bad_img_names)
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=8, pin_memory=True,
-                                shuffle=False, drop_last=False)
+    train_dataloader = prepare_data(args, train_transforms, 'train', shuffle=True, drop_last=True)
+    val_dataloader = prepare_data(args, train_transforms, 'val', shuffle=False, drop_last=False)
 
-    device = torch.device("cuda:0") if args.gpu and torch.cuda.is_available() else torch.device("cpu")
-    model = init_model(args)
-    model.to(device)
-    if args.model_path:
-        with open(args.model_path, "rb") as fp:
-            state_dict = torch.load(fp, map_location="cpu")
-            model.load_state_dict(state_dict)
-
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
-    loss_fn = fnn.mse_loss
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 6, gamma=0.8)
-    writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
+    print("Init model")
+    model, optimizer, loss_fn, scheduler, writer, device = init_model(args)
 
     # 2. train & validate
+    if args.evaluate_only:
+        validate(model, val_dataloader, loss_fn, device=device, writer=writer, epoch=0)
+        return
     print("Ready for training...")
     best_val_loss = np.inf
     for epoch in range(args.epochs):
-        train_loss = train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch)
-        val_loss = validate(model, val_dataloader, loss_fn, device=device, writer=writer, epoch=epoch)
+        print(f"Epoch #{epoch:2}:")
+        train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch)
+        best_val_loss = validate(model, val_dataloader, loss_fn, device=device,
+                                 writer=writer, epoch=epoch, best_val_loss=best_val_loss)
+
         scheduler.step()
         writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
         writer.flush()
-        print("Epoch #{:2}:\ttrain loss: {:5.2}\tval loss: {:5.2}".format(epoch, train_loss, val_loss))
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            with open(os.path.join("runs", f"{args.name}_best.pth"), "wb") as fp:
-                torch.save(model.state_dict(), fp)
 
     # 3. predict
     test_dataset = ThousandLandmarksDataset(os.path.join(args.data, "test"), test_transforms, split="test")
-    test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=4, pin_memory=True,
-                                 shuffle=False, drop_last=False)
+    test_dataloader = prepare_data(args, test_transforms, 'test', shuffle=False, drop_last=False)
 
     with open(os.path.join("runs", f"{args.name}_best.pth"), "rb") as fp:
         best_state_dict = torch.load(fp, map_location="cpu")

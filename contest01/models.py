@@ -1,7 +1,7 @@
 import torchvision.models as models
 import torch.nn as nn
 import torch
-from torchvision import ops
+import timm
 
 from transforms import CROP_SIZE
 
@@ -55,41 +55,23 @@ class AvgResNet(nn.Module):
         return out
 
 
-@add_to_catalog('resnetv3')
-class CnnResNet(nn.Module):
+@add_to_catalog('efficientnet')
+class EfficientNet(nn.Module):
     def __init__(self, output_size):
-        super(CnnResNet, self).__init__()
-        self.model = models.resnet34(pretrained=True)
+        super(EfficientNet, self).__init__()
+        self.model = timm.create_model('efficientnet_b0', pretrained=True)
         self.model.requires_grad_(False)
 
-        fc_input = 512 * 4 ** 2
-        s1_input = 64 * 8 ** 2
-        s2_input = 32 * 16 ** 2
-        self.model.fc = nn.Linear(fc_input + s1_input + s2_input, output_size, bias=True)
-        self.model.fc.requires_grad_(True)
-        # self.model.layer4.requires_grad_(True)
-        # self.model.layer3.requires_grad_(True)
-        # self.model.layer2.requires_grad_(True)
-        self.x3_bottleneck = nn.Conv2d(256, 64, (1, 1))
-        self.x4_bottleneck = nn.Conv2d(128, 32, (1, 1))
+        fc_input = 1280 * (CROP_SIZE // 32) ** 2
+
+        self.fc = nn.Linear(fc_input, output_size, bias=True)
+        self.model.conv_head.requires_grad_(True)
+        self.model.blocks[-4:].requires_grad_(True)
 
     def forward(self, x):
-        x = self.model.conv1(x)
-        x = self.model.bn1(x)
-        x = self.model.relu(x)
-        x = self.model.maxpool(x)
-
-        x1 = self.model.layer1(x)
-        x2 = self.model.layer2(x1)
-        x3 = self.model.layer3(x2)
-        x4 = self.model.layer4(x3)
-
-        x4 = torch.flatten(x4, 1)
-        x3 = self.x3_bottleneck(x3)
-        x3 = torch.flatten(x3, 1)
-        x2 = self.x4_bottleneck(x2)
-        x2 = torch.flatten(x2, 1)
-        out = torch.cat([x4, x3, x2], 1)
-        out = self.model.fc(out)
+        x = self.model.forward_features(x)
+        x = torch.flatten(x, 1)
+        out = self.fc(x)
         return out
+
 

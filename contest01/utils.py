@@ -13,6 +13,7 @@ np.random.seed(1234)
 torch.manual_seed(1234)
 
 TRAIN_SIZE = 0.8
+WIDTH_BINS = [0, 148, 231, 1192]
 SUBMISSION_HEADER = "file_name,Point_M0_X,Point_M0_Y,Point_M1_X,Point_M1_Y," \
                     "Point_M2_X,Point_M2_Y,Point_M3_X,Point_M3_Y,Point_M4_X," \
                     "Point_M4_Y,Point_M5_X,Point_M5_Y,Point_M6_X,Point_M6_Y," \
@@ -152,3 +153,38 @@ def create_submission(path_to_data, test_predictions, path_to_submission_file):
         points_for_image = test_predictions[i]
         needed_points = points_for_image[point_index_list].astype(np.int)
         wf.write(file_name + ',' + ','.join(map(str, needed_points.reshape(2 * len(point_index_list)))) + '\n')
+
+
+def log_val_loss(val_loss, step, writer):
+    writer.add_scalar('val loss', np.mean(val_loss), step)
+
+
+def get_shape_loss(loss, shapes, left, right):
+    idx = (left < shapes[:, 1]) * (shapes[:, 1] <= right)
+    shape_loss = loss[idx]
+    shape_loss = np.mean(shape_loss)
+    return shape_loss
+
+
+def log_shapes_loss(val_loss, shapes, step, writer):
+    val_loss = np.concatenate(val_loss)
+    shapes = np.concatenate(shapes)
+
+    little_loss = get_shape_loss(val_loss, shapes, WIDTH_BINS[0], WIDTH_BINS[1])
+    middle_loss = get_shape_loss(val_loss, shapes, WIDTH_BINS[1], WIDTH_BINS[2])
+    big_loss = get_shape_loss(val_loss, shapes, WIDTH_BINS[2], WIDTH_BINS[3])
+
+    writer.add_scalar('little img loss', little_loss, step)
+    writer.add_scalar('middle img loss', middle_loss, step)
+    writer.add_scalar('big img loss', big_loss, step)
+
+
+def print_val_result(val_loss, shapes):
+    val_loss = np.concatenate(val_loss)
+    shapes = np.concatenate(shapes)
+
+    little_loss = get_shape_loss(val_loss, shapes, WIDTH_BINS[0], WIDTH_BINS[1])
+    middle_loss = get_shape_loss(val_loss, shapes, WIDTH_BINS[1], WIDTH_BINS[2])
+    big_loss = get_shape_loss(val_loss, shapes, WIDTH_BINS[2], WIDTH_BINS[3])
+
+    print(f'All: {val_loss.mean():5.2}\t little: {little_loss:5.2}\t middle: {middle_loss:5.2}\t big: {big_loss:5.2}')
