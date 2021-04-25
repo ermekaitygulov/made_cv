@@ -84,7 +84,7 @@ def validate(model, loader, loss_fn, device, writer, epoch, best_val_loss=None):
             writer.flush()
     print_val_result(val_loss, shapes)
     if best_val_loss and np.concatenate(val_loss).mean() < best_val_loss:
-        best_val_loss = val_loss
+        best_val_loss = np.concatenate(val_loss).mean()
         with open(os.path.join("runs", f"{args.name}_best.pth"), "wb") as fp:
             torch.save(model.state_dict(), fp)
     return best_val_loss
