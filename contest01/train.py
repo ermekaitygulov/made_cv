@@ -134,7 +134,8 @@ def init_model(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 6, gamma=0.8)
+    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=1e-4, max_lr=3e-3, step_size_up=5,
+                                            mode='triangular2')
     writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
     return model, optimizer, loss_fn, scheduler, writer, device
 
