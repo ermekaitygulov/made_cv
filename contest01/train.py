@@ -57,6 +57,7 @@ def train(model, loader, loss_fn, optimizer, scheduler, device, writer, epoch):
         scheduler.step()
         if (i + 1) % 10 == 0:
             writer.add_scalar('train loss', np.mean(train_loss[-10:]), i + epoch * len(loader))
+            writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], i + epoch * len(loader))
             writer.flush()
     train_loss = np.mean(train_loss)
     print(f"Train loss: {train_loss:5.2}")
@@ -180,8 +181,8 @@ def main(args):
                                  writer=writer, epoch=epoch, best_val_loss=best_val_loss)
 
         # scheduler.step()
-        writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
-        writer.flush()
+        # writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
+        # writer.flush()
 
     # 3. predict
     test_dataset = ThousandLandmarksDataset(os.path.join(args.data, "test"), test_transforms, split="test")
