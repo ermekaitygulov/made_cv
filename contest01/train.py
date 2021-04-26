@@ -164,7 +164,7 @@ def main(args):
     model, optimizer, loss_fn, writer, device = init_model(args)
 
     scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.1,
-                                              steps_per_epoch=len(train_dataloader) // args.batch_size,
+                                              steps_per_epoch=len(train_dataloader),
                                               epochs=args.epochs)
 
     # 2. train & validate
