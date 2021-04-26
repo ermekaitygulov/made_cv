@@ -39,7 +39,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def train(model, loader, loss_fn, optimizer, device, writer, epoch):
+def train(model, loader, loss_fn, optimizer, scheduler, device, writer, epoch):
     model.train()
     train_loss = []
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="training...")):
@@ -54,6 +54,7 @@ def train(model, loader, loss_fn, optimizer, device, writer, epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        scheduler.step()
         if (i + 1) % 10 == 0:
             writer.add_scalar('train loss', np.mean(train_loss[-10:]), i + epoch * len(loader))
             writer.flush()
@@ -134,9 +135,8 @@ def init_model(args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
     loss_fn = fnn.mse_loss
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 4, 1e-6)
     writer = SummaryWriter(log_dir=os.path.join('runs', f'{args.name}_tb'))
-    return model, optimizer, loss_fn, scheduler, writer, device
+    return model, optimizer, loss_fn, writer, device
 
 
 def main(args):
@@ -161,7 +161,11 @@ def main(args):
     val_dataloader = prepare_data(args, train_transforms, 'val', shuffle=False, drop_last=False)
 
     print("Init model")
-    model, optimizer, loss_fn, scheduler, writer, device = init_model(args)
+    model, optimizer, loss_fn, writer, device = init_model(args)
+
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.1,
+                                              steps_per_epoch=len(train_dataloader) // args.batch_size,
+                                              epochs=args.epochs)
 
     # 2. train & validate
     if args.evaluate_only:
@@ -171,11 +175,11 @@ def main(args):
     best_val_loss = np.inf
     for epoch in range(args.epochs):
         print(f"Epoch #{epoch:2}:")
-        train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch)
+        train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch, scheduler=scheduler)
         best_val_loss = validate(model, val_dataloader, loss_fn, device=device,
                                  writer=writer, epoch=epoch, best_val_loss=best_val_loss)
 
-        scheduler.step()
+        # scheduler.step()
         writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
         writer.flush()
 
