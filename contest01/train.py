@@ -39,7 +39,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def train(model, loader, loss_fn, optimizer, scheduler, device, writer, epoch):
+def train(model, loader, loss_fn, optimizer, device, writer, epoch):
     model.train()
     train_loss = []
     for i, batch in enumerate(tqdm.tqdm(loader, total=len(loader), desc="training...")):
@@ -54,7 +54,6 @@ def train(model, loader, loss_fn, optimizer, scheduler, device, writer, epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step()
         if (i + 1) % 10 == 0:
             writer.add_scalar('train loss', np.mean(train_loss[-10:]), i + epoch * len(loader))
             writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], i + epoch * len(loader))
@@ -164,9 +163,7 @@ def main(args):
     print("Init model")
     model, optimizer, loss_fn, writer, device = init_model(args)
 
-    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.1,
-                                              steps_per_epoch=len(train_dataloader),
-                                              epochs=args.epochs)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)
 
     # 2. train & validate
     if args.evaluate_only:
@@ -176,21 +173,22 @@ def main(args):
     best_val_loss = np.inf
     for epoch in range(args.epochs):
         print(f"Epoch #{epoch:2}:")
-        train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch, scheduler=scheduler)
+        train(model, train_dataloader, loss_fn, optimizer, device=device, writer=writer, epoch=epoch)
         best_val_loss = validate(model, val_dataloader, loss_fn, device=device,
                                  writer=writer, epoch=epoch, best_val_loss=best_val_loss)
 
-        # scheduler.step()
-        # writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
-        # writer.flush()
-
+        scheduler.step()
+        writer.add_scalar('learning rate', optimizer.param_groups[0]["lr"], epoch)
+        writer.flush()
+    with open(os.path.join("runs", f"{args.name}_last.pth"), "wb") as fp:
+        torch.save(model.state_dict(), fp)
     # 3. predict
     test_dataset = ThousandLandmarksDataset(os.path.join(args.data, "test"), test_transforms, split="test")
     test_dataloader = prepare_data(args, test_transforms, 'test', shuffle=False, drop_last=False)
 
-    with open(os.path.join("runs", f"{args.name}_best.pth"), "rb") as fp:
-        best_state_dict = torch.load(fp, map_location="cpu")
-        model.load_state_dict(best_state_dict)
+    # with open(os.path.join("runs", f"{args.name}_best.pth"), "rb") as fp:
+    #     best_state_dict = torch.load(fp, map_location="cpu")
+    #     model.load_state_dict(best_state_dict)
 
     test_predictions = predict(model, test_dataloader, device)
     with open(os.path.join("runs", f"{args.name}_test_predictions.pkl"), "wb") as fp:

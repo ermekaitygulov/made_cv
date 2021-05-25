@@ -12,7 +12,7 @@ from transforms import NUM_PTS, CROP_SIZE
 np.random.seed(1234)
 torch.manual_seed(1234)
 
-TRAIN_SIZE = 0.8
+TRAIN_SIZE = 0.99
 WIDTH_BINS = [0, 148, 231, 1192]
 SUBMISSION_HEADER = "file_name,Point_M0_X,Point_M0_Y,Point_M1_X,Point_M1_Y," \
                     "Point_M2_X,Point_M2_Y,Point_M3_X,Point_M3_Y,Point_M4_X," \
