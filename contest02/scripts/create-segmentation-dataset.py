@@ -23,8 +23,7 @@ def main(args):
     config_segmentation = []
 
     for item in tqdm.tqdm(config):
-        new_item = {}
-        new_item["file"] = item["file"]
+        new_item = {"file": item["file"]}
 
         image_filename = item["file"]
         image_base, ext = os.path.splitext(image_filename)

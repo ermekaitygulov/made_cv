@@ -1,0 +1,1 @@
+from neural_network.recognition_models import REC_NN_CATALOG

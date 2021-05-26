@@ -1,0 +1,23 @@
+data:
+  train_transforms:
+    image_size: [320, 64]
+    augs: 0
+  val_transforms:
+    image_size: [320, 64]
+  batch_size: 64
+  path: '../contest02/data'
+  num_workers: 8
+Adam_stage:
+  epoch: 1
+  save_mod: 5
+  log_window_size: 10
+  opt_class: Adam
+model:
+  name: baseline
+  params:
+    cnn_input_size: [64, 320]
+    cnn_output_len: 20
+    rnn_hidden_size: 128
+    rnn_num_layers: 1
+    rnn_dropout: 0.0
+    rnn_bidirectional: False
