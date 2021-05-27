@@ -1,0 +1,22 @@
+data_path: '../contest02/data'
+size: [320, 64]
+seg_threshold: 0.5
+output_file: baseline_submission.csv
+seg_model:
+  name: baseline
+  path: Adam_stage-seg_model_best.pt
+  params:
+    encoder_name: resnet34
+    encoder_weights: imagenet
+    in_channels: 3
+    classes: 1
+rec_model:
+  name: baseline
+  path: Adam_stage-rec_model_best.pt
+  params:
+    cnn_input_size: [64, 320]
+    cnn_output_len: 20
+    rnn_hidden_size: 128
+    rnn_num_layers: 1
+    rnn_dropout: 0.0
+    rnn_bidirectional: False
