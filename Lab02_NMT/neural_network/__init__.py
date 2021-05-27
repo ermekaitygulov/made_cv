@@ -1,1 +1,2 @@
 from neural_network.recognition_models import REC_NN_CATALOG
+from neural_network.segmentation_models import SEG_NN_CATALOG

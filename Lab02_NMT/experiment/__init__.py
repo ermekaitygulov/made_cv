@@ -1,2 +1,3 @@
 from experiment.base import Experiment, EXPERIMENT_CATALOG
 import experiment.recognition
+import experiment.segmentation

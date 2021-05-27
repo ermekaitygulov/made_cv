@@ -7,7 +7,7 @@ from experiment import EXPERIMENT_CATALOG
 from experiment.base import Experiment
 from neural_network import REC_NN_CATALOG
 from train_stage import RecognitionStage
-from transforms import get_train_transforms, get_val_transforms
+from dataset.rec_transforms import get_train_transforms, get_val_transforms
 from utils import add_to_catalog, ALPHABET
 
 

@@ -1,19 +1,18 @@
 import math
 from collections import deque
-import os
 
 import editdistance
 import numpy as np
 import torch
-import wandb
-from torch import optim
 from torch.nn.functional import ctc_loss, log_softmax
 from tqdm import tqdm
+import wandb
 
+from train_stage.base import BaseStage
 from utils import ALPHABET
 
 
-class RecognitionStage:
+class RecognitionStage(BaseStage):
     default_config = {
         'opt_class': 'Adam',
         'opt_params': {},
@@ -23,14 +22,8 @@ class RecognitionStage:
     }
 
     def __init__(self, model, stage_name, device, stage_config):
-        self.config = self.default_config.copy()
-        self.config.update(stage_config)
-        self.name = stage_name
-        self.model = model
-        self.opt = self.init_opt()
-        self.lr_scheduler = self.init_scheduler()
+        super(RecognitionStage, self).__init__(model, stage_name, device, stage_config)
         self.criterion = ctc_loss
-        self.device = device
 
     def train(self, train_iterator, val_iterator):
         train_step = 0
@@ -95,7 +88,7 @@ class RecognitionStage:
                     wandb.log({self.name: log_dict})
                 tqdm_iterator.set_postfix(train_loss=mean_loss)
 
-        global_step += 1
+            global_step += 1
 
         return epoch_loss / len(iterator), global_step
 
@@ -127,26 +120,3 @@ class RecognitionStage:
         if wandb.run:
             wandb.log({'Val acc': acc, 'Val acc ed': avg_ed, 'epoch': epoch})
         return acc, avg_ed
-
-    def save_model(self, name):
-        if wandb.run:
-            save_path = os.path.join('model_save', wandb.run.name)
-            os.makedirs(save_path, exist_ok=True)
-            torch.save(self.model.state_dict(), os.path.join(save_path, name))
-        else:
-            torch.save(self.model.state_dict(), name)
-
-    def init_opt(self):
-        opt_class = getattr(optim, self.config['opt_class'])
-        opt_params = self.config['opt_params']
-        opt = opt_class(self.model.parameters(), **opt_params)
-        return opt
-
-    def init_scheduler(self):
-        # TODO refactor
-        if 'scheduler_class' not in self.config:
-            return None
-        scheduler_class = getattr(optim.lr_scheduler, self.config['scheduler_class'])
-        scheduler_params = self.config['scheduler_params']
-        scheduler = scheduler_class(self.opt, **scheduler_params)
-        return scheduler

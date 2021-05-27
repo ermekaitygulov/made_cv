@@ -1,2 +1,3 @@
+from train_stage.segmentation import SegmentationStage
 from train_stage.recognition import RecognitionStage
 from train_stage.compose_stage import ComposeStage
