@@ -55,7 +55,7 @@ def main(args):
 
         # 1. Segmentation.
         image, k, dw, dh = prepare_for_segmentation(image_src.astype(np.float) / 255.,
-                                                    (config['seg_size']))
+                                                    tuple(config['seg_size']))
         x = torch.from_numpy(image.transpose(2, 0, 1)).float().unsqueeze(0)
         with torch.no_grad():
             pred = torch.sigmoid(segmentation_model(x.to(device))).squeeze().cpu().numpy()
