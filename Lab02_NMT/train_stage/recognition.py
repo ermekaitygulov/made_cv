@@ -43,8 +43,8 @@ class RecognitionStage(BaseStage):
                 best_val_acc = val_acc
 
             print(f'Epoch: {epoch + 1:02}')
-            print(f'\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}')
-            print(f'\t Val. acc: {val_acc:.3f} |  Val. acc_ed: {math.exp(val_acc_ed):7.3f}'
+            print(f'\tTrain Loss: {train_loss:.3f}')
+            print(f'\t Val. acc: {val_acc:.3f} |  Val. ed: {val_acc_ed:7.3f}'
                   f' (best: {best_val_acc:.3f})')
         self.save_model(f'{self.name}-rec_model_last.pt')
 
@@ -118,5 +118,5 @@ class RecognitionStage(BaseStage):
         acc = tp / count
         avg_ed = avg_ed / count
         if wandb.run:
-            wandb.log({'Val acc': acc, 'Val acc ed': avg_ed, 'epoch': epoch})
+            wandb.log({'Val acc': acc, 'Val ed': avg_ed, 'epoch': epoch})
         return acc, avg_ed

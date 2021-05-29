@@ -1,13 +1,13 @@
 data:
   train_transforms:
-    image_size: 128
+    image_size: 256
   val_transforms:
-    image_size: 128
-  batch_size: 32
+    image_size: 256
+  batch_size: 8
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
-  weight_bce: 1.
+  weight_bce: 0.5
   epoch: 1
   save_mod: 5
   log_window_size: 10

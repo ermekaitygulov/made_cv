@@ -17,7 +17,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def get_crop(image, box):
+def bounding_box_crop(image, box):
     # TODO TIP: Maybe adding some margin could help.
     x_min = np.clip(min(box[:, 0]), 0, image.shape[1])
     x_max = np.clip(max(box[:, 0]), 0, image.shape[1])
@@ -26,11 +26,56 @@ def get_crop(image, box):
     return image[y_min: y_max, x_min: x_max]
 
 
+def order_pts(box):
+    box = np.array(box)
+    rect = np.zeros((4, 2), dtype="float32")
+
+    s = box.sum(axis=1)
+    rect[0] = box[np.argmin(s)]
+    rect[2] = box[np.argmax(s)]
+
+    diff = np.diff(box, axis=1)
+    rect[1] = box[np.argmin(diff)]
+    rect[3] = box[np.argmax(diff)]
+    return rect
+
+
+def compute_max_wh(box):
+    (tl, tr, br, bl) = box
+    width_a = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    width_b = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    # ...and now for the height of our new image
+    height_a = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    height_b = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    # take the maximum of the width and height values to reach
+    # our final dimensions
+    max_width = max(int(width_a), int(width_b))
+    max_height = max(int(height_a), int(height_b))
+    return max_width, max_height
+
+
+def warp_perspective(image, box, margin):
+    box = order_pts(box)
+    max_width, max_height = compute_max_wh(box)
+    dst = np.array([
+        [0, 0],
+        [max_width - 1, 0],
+        [max_width - 1, max_height - 1],
+        [0, max_height - 1]],
+        dtype="float32"
+    )
+    transform = cv2.getPerspectiveTransform(box, dst)
+    warp = cv2.warpPerspective(image, transform, (max_width, max_height))
+    return warp
+
+
 def main(args):
     if args.transform:
         # TODO TIP: Maybe useful to crop using corners
         # See cv2.findHomography & cv2.warpPerspective for more
-        raise NotImplementedError
+        get_crop = warp_perspective
+    else:
+        get_crop = bounding_box_crop
 
     config_filename = os.path.join(args.data_dir, "train.json")
     with open(config_filename, "rt") as fp:

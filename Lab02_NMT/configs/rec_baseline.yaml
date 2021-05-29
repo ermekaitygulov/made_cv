@@ -8,7 +8,7 @@ data:
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
-  epoch: 1
+  epoch: 5
   save_mod: 5
   log_window_size: 10
   opt_class: Adam

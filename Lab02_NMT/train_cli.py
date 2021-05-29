@@ -10,7 +10,7 @@ from experiment import EXPERIMENT_CATALOG
 WANDB_GLOBAL = dict(
     entity='ermekaitygulov',
     anonymous='allow',
-    project='NLP-LAB2'
+    project='CV2'
 )
 
 
