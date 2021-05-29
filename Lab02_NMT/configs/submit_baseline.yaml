@@ -1,7 +1,7 @@
 data_path: '../contest02/data'
 size: [320, 64]
 seg_threshold: 0.1
-output_file: baseline_submission.csv
+output_file: warp_perspective_submission.csv
 seg_model:
   name: baseline
   path: model_save/segmentation_1qyyw359/Adam_stage-seg_model_best.pt
@@ -12,7 +12,7 @@ seg_model:
     classes: 1
 rec_model:
   name: baseline
-  path: model_save/recognition_2seyvpme/Adam_stage-rec_model_best.pt
+  path: model_save/recognition_2eol4n5p/Adam_stage-rec_model_best.pt
   params:
     cnn_input_size: [64, 320]
     cnn_output_len: 20

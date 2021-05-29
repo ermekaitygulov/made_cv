@@ -9,7 +9,7 @@ import tqdm
 import yaml
 
 from neural_network import REC_NN_CATALOG, SEG_NN_CATALOG
-from inference_utils import prepare_for_segmentation, get_boxes_from_mask, prepare_for_recognition
+from inference_utils import prepare_for_segmentation, find_min_box, prepare_for_recognition, warp_perspective
 
 
 def parse_arguments():
@@ -62,31 +62,27 @@ def main(args):
         mask = (pred >= config['seg_threshold']).astype(np.uint8) * 255
 
         # 2. Extraction of detected regions.
-        boxes = get_boxes_from_mask(mask, margin=0., clip=False)
+        boxes = find_min_box(mask)
         if len(boxes) == 0:
             results.append((file_name, []))
             continue
-        boxes[:, [0, 2]] *= mask.shape[1]
-        boxes[:, [1, 3]] *= mask.shape[0]
-        boxes = boxes.astype(np.float)
 
         # 3. Text recognition for every detected bbox.
         texts = []
         for box in boxes:
-            box[[0, 2]] -= dw
-            box[[1, 3]] -= dh
+            box[:, 0] -= dw
+            box[:, 1] -= dh
             box /= k
-            box[[0, 2]] = box[[0, 2]].clip(0, image_src.shape[1] - 1)
-            box[[1, 3]] = box[[1, 3]].clip(0, image_src.shape[0] - 1)
+            box[:, 0] = box[:, 0].clip(0, image_src.shape[1] - 1)
+            box[:, 1] = box[:, 1].clip(0, image_src.shape[0] - 1)
             box = box.astype(np.int)
-            x1, y1, x2, y2 = box
-            if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0:
-                raise (Exception, str(box))
-            crop = image_src[y1: y2, x1: x2, :]
+            #         crop = image_src[y1: y2, x1: x2, :]
+            crop = warp_perspective(image_src, box)
 
             tensor = prepare_for_recognition(crop, (w, h)).to(device)
             with torch.no_grad():
                 text = recognition_model(tensor, decode=True)[0]
+            x1 = box[0][0]
             texts.append((x1, text))
 
         # all predictions must be sorted by x1
