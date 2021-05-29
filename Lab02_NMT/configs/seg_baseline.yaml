@@ -1,8 +1,8 @@
 data:
   train_transforms:
-    image_size: 256
+    image_size: 320
   val_transforms:
-    image_size: 256
+    image_size: 320
   batch_size: 8
   path: '../contest02/data'
   num_workers: 8

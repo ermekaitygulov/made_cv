@@ -1,5 +1,6 @@
 data_path: '../contest02/data'
-size: [320, 64]
+rec_size: [320, 64]
+seg_size: [320, 320]
 seg_threshold: 0.1
 output_file: warp_perspective_submission.csv
 seg_model:
