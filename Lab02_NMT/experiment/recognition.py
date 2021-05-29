@@ -24,7 +24,7 @@ class Baseline(Experiment):
         train_transforms = get_train_transforms(**data_config['train_transforms'])
 
         data_path = data_config['path']
-        train_dataset = RecognitionDataset(data_path, os.path.join(data_path, "train_recognition.json"),
+        train_dataset = RecognitionDataset(data_path, os.path.join(data_path, "big_rec.json"),
                                            abc=ALPHABET, transforms=train_transforms, split="train")
         train_dataloader = DataLoader(train_dataset,
                                       batch_size=data_config['batch_size'],

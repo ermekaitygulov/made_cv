@@ -54,8 +54,22 @@ def compute_max_wh(box):
     return max_width, max_height
 
 
-def warp_perspective(image, box, margin):
+def add_noise(image, box, noise):
+    direction = np.array([
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1]
+    ])
+    noise = (np.random.random(box.shape) * noise * image.shape[:-1]).astype(int)
+    box += direction * noise
+    return box
+
+
+def warp_perspective(image, box, noise=0.02):
     box = order_pts(box)
+    box = add_noise(image, box, noise)
+
     max_width, max_height = compute_max_wh(box)
     dst = np.array([
         [0, 0],

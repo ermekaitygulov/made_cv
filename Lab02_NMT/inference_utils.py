@@ -70,6 +70,16 @@ def prepare_for_recognition(image, output_size):
     return torch.from_numpy(image.transpose(2, 0, 1)).float().unsqueeze(0)
 
 
+def find_min_box(mask):
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    boxes = []
+    for cnt in contours:
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        boxes.append(box)
+    return np.array(boxes)
+
+
 def order_pts(box):
     box = np.array(box)
     rect = np.zeros((4, 2), dtype="float32")
