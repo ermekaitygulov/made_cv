@@ -66,6 +66,10 @@ def main(args):
         with torch.no_grad():
             pred = torch.sigmoid(segmentation_model(x.to(device))).squeeze().cpu().numpy()
         mask = (pred >= config['seg_threshold']).astype(np.uint8) * 255
+        # kernel = np.ones((3, 3), np.uint8)
+        # mask = cv2.erode(mask, kernel, iterations=2)
+        # kernel = np.ones((5, 5), np.uint8)
+        # mask = cv2.dilate(mask, kernel, iterations=3)
 
         # 2. Extraction of detected regions.
         boxes = find_min_box(mask)

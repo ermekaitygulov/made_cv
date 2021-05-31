@@ -7,7 +7,7 @@ max_wh_odd: 10
 output_file: 512_seg.csv
 seg_model:
   name: baseline
-  path: model_save/segmentation_2gicqc42/Adam_stage-seg_model_best.pt
+  path: model_save/segmentation_o4hvh9a9/Adam_stage-seg_model_best.pt
   params:
     encoder_name: resnet34
     encoder_weights: imagenet

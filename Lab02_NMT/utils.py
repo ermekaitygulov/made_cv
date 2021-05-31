@@ -113,3 +113,27 @@ class FocalLoss(nn.Module):
             return torch.mean(focal_loss)
         else:
             return focal_loss
+
+
+class TverskyLoss(nn.Module):
+    def __init__(self, alpha=0.5, beta=0.5):
+        super(TverskyLoss, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+
+    def forward(self, inputs, targets):
+        # comment out if your model contains a sigmoid or equivalent activation layer
+        inputs = F.sigmoid(inputs)
+
+        # flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+
+        # True Positives, False Positives & False Negatives
+        true_positive = (inputs * targets).sum()
+        false_positive = ((1 - targets) * inputs).sum()
+        false_negative = (targets * (1 - inputs)).sum()
+
+        tversky = (true_positive + 1.) / (true_positive + self.alpha * false_positive + self.beta * false_negative + 1.)
+
+        return - torch.log(tversky)
