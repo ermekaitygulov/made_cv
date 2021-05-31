@@ -27,7 +27,8 @@ class DetectionDataset(Dataset):
             else:
                 raise NotImplementedError(split)
 
-    def _parse_root_(self, config_file):
+    @staticmethod
+    def _parse_root_(config_file):
         with open(config_file, "rt") as f:
             config = json.load(f)
         image_filenames, mask_filenames = [], []

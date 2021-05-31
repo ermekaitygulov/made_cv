@@ -2,6 +2,8 @@ from collections import namedtuple
 
 import numpy as np
 import torch
+from torch import nn
+import torch.nn.functional as F
 
 Task = namedtuple('Task', ['train', 'val'])
 
@@ -90,3 +92,24 @@ def dice_coeff(input, target):
 def dice_loss(input, target):
     # TODO TIP: Optimizing the Dice Loss usually helps segmentation a lot.
     return - torch.log(dice_coeff(input, target))
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2, logits=True, reduce=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.logits = logits
+        self.reduce = reduce
+
+    def forward(self, inputs, targets):
+        if self.logits:
+            bce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduce=False)
+        else:
+            bce_loss = F.binary_cross_entropy(inputs, targets, reduce=False)
+        pt = torch.exp(-bce_loss)
+        focal_loss = (1 - pt)**self.gamma * bce_loss
+
+        if self.reduce:
+            return torch.mean(focal_loss)
+        else:
+            return focal_loss

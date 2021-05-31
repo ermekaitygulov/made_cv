@@ -1,5 +1,6 @@
 import os
 
+from torch import nn
 from torch.utils.data import DataLoader
 
 from dataset.segmentation import DetectionDataset
@@ -14,6 +15,13 @@ from utils import add_to_catalog
 @add_to_catalog('segmentation', EXPERIMENT_CATALOG)
 class Baseline(Experiment):
     nn_catalog = SEG_NN_CATALOG
+
+    def __init__(self, config, device):
+        super(Baseline, self).__init__(config, device)
+        if config['model']['freeze_bn']:
+            for layer in self.model.modules():
+                if isinstance(layer, nn.BatchNorm2d):
+                    layer.requires_grad_(False)
 
     def init_trainer(self):
         stage = SegmentationStage(self.model, 'Adam_stage', self.device, self.config['Adam_stage'])

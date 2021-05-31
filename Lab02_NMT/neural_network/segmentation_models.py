@@ -1,7 +1,6 @@
-from typing import Type, Dict
+from typing import Dict
 
 import segmentation_models_pytorch as smp
-from torch.nn import Module
 
 from utils import add_to_catalog
 

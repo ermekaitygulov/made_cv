@@ -1,18 +1,20 @@
 data:
   train_transforms:
-    image_size: 320
+    image_size: 512
   val_transforms:
-    image_size: 320
+    image_size: 512
   batch_size: 8
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
-  weight_bce: 0.5
+  weight_focal: 0.5
+  focal_gamma: 2
   epoch: 1
   save_mod: 5
   log_window_size: 10
   opt_class: Adam
 model:
+  freeze_bn: True
   name: baseline
   params:
     encoder_name: resnet34

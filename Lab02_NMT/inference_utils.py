@@ -1,4 +1,6 @@
 import logging
+from string import ascii_uppercase, digits
+
 import cv2
 import numpy as np
 import torch
@@ -115,6 +117,11 @@ def compute_max_wh(box):
     return max_width, max_height
 
 
+def weight_height_odd(box):
+    max_width, max_height = compute_max_wh(box)
+    return max_width / (max_height + 1e-3)
+
+
 def warp_perspective(image, box):
     box = order_pts(box)
     max_width, max_height = compute_max_wh(box)
@@ -128,3 +135,49 @@ def warp_perspective(image, box):
     transform = cv2.getPerspectiveTransform(box, dst)
     warp = cv2.warpPerspective(image, transform, (max_width, max_height))
     return warp
+
+
+def compute_mask(text):
+    """Compute letter-digit mask of text, e.g. 'E506EC152' -> 'LDDDLLDDD'.
+
+    Args:
+        - text: String of text.
+
+    Returns:
+        String of the same length but with every letter replaced by 'L' and every digit replaced by 'D'
+        or None if non-letter and non-digit character met in text.
+    """
+    mask = []
+    mask_map = {
+        'L': ascii_uppercase,
+        'D': digits
+    }
+    for char in text:
+        is_strange = True
+        for key, char_group in mask_map.items():
+            if char in char_group:
+                mask.append(key)
+                is_strange = False
+                break
+        if is_strange:
+            return
+
+    return "".join(mask)
+
+
+def filter_data(config):
+    """Filter config items keeping only ones with correct text.
+
+    Args:
+        - config: List of dicts, each dict having keys "file" and "text".
+
+    Returns:
+        Filtered list (config subset).
+    """
+    config_filtered = []
+    for item in config:
+        text = item["text"]
+        mask = compute_mask(text)
+        if mask == "LDDDLLDD" or mask == "LDDDLLDDD":
+            config_filtered.append(item)
+    return config_filtered
