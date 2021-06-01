@@ -17,16 +17,17 @@ class DetectionDataset(Dataset):
         self.data_path = data_path
         self.transforms = transforms
         self.split = split
-
         self.image_filenames, self.mask_filenames, self.nums = self._parse_root_(config_file)
         if self.split is not None:
             train_size = int(len(self.image_filenames) * TRAIN_SIZE)
             if self.split == "train":
                 self.image_filenames = self.image_filenames[:train_size]
                 self.mask_filenames = self.mask_filenames[:train_size]
+                self.nums = self.mask_filenames[:train_size]
             elif split == "val":
                 self.image_filenames = self.image_filenames[train_size:]
                 self.mask_filenames = self.mask_filenames[train_size:]
+                self.nums = self.mask_filenames[train_size:]
             else:
                 raise NotImplementedError(split)
 
@@ -50,23 +51,22 @@ class DetectionDataset(Dataset):
     def __getitem__(self, item):
         image_filename = os.path.join(self.data_path, self.image_filenames[item])
         mask_filename = os.path.join(self.data_path, self.mask_filenames[item])
-        nums = self.nums[item]
 
         image = cv2.imread(image_filename).astype(np.float32) / 255.
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         mask = cv2.imread(mask_filename, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.
 
-        if len(nums) == 1:
-            image, mask = self.license_augment(image, mask, nums)
-
         if self.transforms is not None:
-            image, mask = self.transforms(image, mask)
-        return image.transpose(2, 0, 1), mask
+            transformed = self.transforms(image=image, mask=mask)
+            image, mask = transformed['image'], transformed['mask']
+        return image, mask
 
     def license_augment(self, image, mask, nums):
         box = np.array(nums[0]['box'])
         box = order_pts(box)
         max_w, max_h = compute_max_wh(box)
+        max_w /= 2
+        max_h /= 2
 
         img_w = image.shape[1]
         if box[:, 1].min() - max_h <= 0 or img_w - max_w <= 0:
@@ -94,10 +94,11 @@ class DetectionDataset(Dataset):
             [0, lic_height - 1]],
             dtype="float32"
         )
+        lic_mask = np.zeros(shape=image.shape[:2], dtype=np.uint8)
         M = cv2.getPerspectiveTransform(lic_box, dstn)
         rslt = cv2.warpPerspective(license_src, M, image.shape[1::-1])
         image = (rslt == 0) * image + rslt
-        mask += (rslt != 0) * 255
+        mask = mask + cv2.fillConvexPoly(lic_mask, dstn.astype(int), 1.)
         return image, mask
 
 

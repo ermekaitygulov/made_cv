@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import albumentations as A
+from albumentations.pytorch.transforms import ToTensorV2
 
 
 class Compose(object):
@@ -19,14 +21,16 @@ class Pad(object):
         self.max_size = max_size
         self.p = p
 
-    def __call__(self, image, mask):
+    def __call__(self, image, mask, **kwargs):
         if np.random.uniform(0.0, 1.0) > self.p:
-            return image, mask
+            return {'image': image,
+                    'mask': mask}
         h, w, _ = image.shape
         size = int(np.random.uniform(0, self.max_size) * min(w, h))
         image_ = cv2.copyMakeBorder(image, size, size, size, size, borderType=cv2.BORDER_CONSTANT, value=0.0)
         mask_ = cv2.copyMakeBorder(mask, size, size, size, size, borderType=cv2.BORDER_CONSTANT, value=0.0)
-        return image_, mask_
+        return {'image': image_,
+                'mask': mask_}
 
 
 class Crop(object):
@@ -36,9 +40,10 @@ class Crop(object):
         self.max_ratio = max_ratio
         self.p = p
 
-    def __call__(self, image, mask):
+    def __call__(self, image, mask, **kwargs):
         if np.random.uniform(0.0, 1.0) > self.p:
-            return image, mask
+            return {'image': image,
+                    'mask': mask}
         h, w, _ = image.shape
         aspect_ratio = np.random.uniform(self.min_ratio, self.max_ratio)  # = w / h
         if aspect_ratio > 1:
@@ -52,7 +57,8 @@ class Crop(object):
         y = np.random.randint(0, max(1, h - h_))
         crop_image = image[y: y + h_, x: x + w_, :]
         crop_mask = mask[y: y + h_, x: x + w_]
-        return crop_image, crop_mask
+        return {'image': crop_image,
+                'mask': crop_mask}
 
 
 class Resize(object):
@@ -60,7 +66,7 @@ class Resize(object):
         self.size = size
         self.keep_aspect = keep_aspect
 
-    def __call__(self, image, mask):
+    def __call__(self, image, mask, **kwargs):
         image_, mask_ = image.copy(), mask.copy()
         if self.keep_aspect:
             # padding step
@@ -80,17 +86,20 @@ class Resize(object):
         if image_.shape[0] != self.size[1] or image_.shape[1] != self.size[0]:
             image_ = cv2.resize(image_, self.size)
             mask_ = cv2.resize(mask_, self.size)
-        return image_, mask_
+        return {'image': image_,
+                'mask': mask_}
 
 
 class Flip(object):
     def __init__(self, p=0.1):
         self.p = p
 
-    def __call__(self, image, mask):
+    def __call__(self, image, mask, **kwargs):
         if np.random.uniform() > self.p:
-            return image, mask
-        return cv2.flip(image, 1), cv2.flip(mask, 1)
+            return {'image': image,
+                    'mask': mask}
+        return {'image': cv2.flip(image, 1),
+                'mask': cv2.flip(mask, 1)}
 
 
 class Normalize(object):
@@ -98,26 +107,36 @@ class Normalize(object):
         self.mean = np.asarray(mean).reshape((1, 1, 3)).astype(np.float32)
         self.std = np.asarray(std).reshape((1, 1, 3)).astype(np.float32)
 
-    def __call__(self, image, mask):
+    def __call__(self, image, mask, **kwargs):
         image = (image - self.mean) / self.std
-        return image, mask
+        return {'image': image,
+                'mask': mask}
 
 
 # TODO TIP: Is default image size (256) enough for segmentation of car license plates?
 # TODO TIP: Chances are there's a great lib for complex data augmentations, 'Albumentations' or so...
 # TODO TIP: Keywords to think about: 'class imbalance', 'lack of data'.
 def get_train_transforms(image_size):
-    return Compose([
+    return A.Compose([
+        A.ColorJitter(
+            brightness=(0.7, 1.),
+            contrast=(0.7, 1.),
+            saturation=0.,
+            hue=0.,
+            p=0.5,
+        ),
         Normalize(),
         Crop(min_size=1 - 1 / 3., min_ratio=1.0, max_ratio=1.0, p=0.5),
         Flip(p=0.05),
         Pad(max_size=0.6, p=0.25),
-        Resize(size=(image_size, image_size), keep_aspect=True)
+        Resize(size=(image_size, image_size), keep_aspect=True),
+        ToTensorV2()
     ])
 
 
 def get_val_transforms(image_size):
-    return Compose([
+    return A.Compose([
         Normalize(),
-        Resize(size=(image_size, image_size))
+        Resize(size=(image_size, image_size)),
+        ToTensorV2()
     ])

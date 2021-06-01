@@ -36,7 +36,8 @@ class SegmentationStage(BaseStage):
             )
 
             val_dice = self.val_epoch(val_iterator, epoch)
-
+            if self.lr_scheduler:
+                self.lr_scheduler.step()
             if (epoch + 1) % self.config['save_mod'] == 0:
                 self.save_model(f'{self.name}-seg_model{epoch}.pt')
             if val_dice > best_val_dice:
@@ -78,8 +79,6 @@ class SegmentationStage(BaseStage):
 
             loss.backward()
             self.opt.step()
-            if self.lr_scheduler:
-                self.lr_scheduler.step()
 
             if(i + 1) % self.config['log_window_size'] == 0:
                 log_dict = dict()

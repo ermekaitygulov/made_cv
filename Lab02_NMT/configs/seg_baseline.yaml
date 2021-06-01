@@ -1,18 +1,23 @@
 data:
+  reweight_deg: 3
   train_transforms:
-    image_size: 512
+    image_size: 320
   val_transforms:
-    image_size: 512
+    image_size: 320
   batch_size: 8
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
-  weight_focal: 0.5
-  focal_gamma: 2
-  epoch: 1
+  weight_focal: 0.7
+  focal_gamma: 4
+  epoch: 3
   save_mod: 5
   log_window_size: 10
   opt_class: Adam
+  scheduler_class: StepLR
+  scheduler_params:
+    step_size: 1
+    gamma: 0.1
 model:
   freeze_bn: True
   name: baseline
@@ -21,3 +26,4 @@ model:
     encoder_weights: imagenet
     in_channels: 3
     classes: 1
+    decoder_attention_type: scse

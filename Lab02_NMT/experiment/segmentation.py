@@ -1,7 +1,7 @@
 import os
 
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from dataset.segmentation import DetectionDataset
 from experiment import EXPERIMENT_CATALOG
@@ -34,9 +34,12 @@ class Baseline(Experiment):
         train_transforms = get_train_transforms(**data_config['train_transforms'])
         train_dataset = DetectionDataset(data_path, os.path.join(data_path, "train_segmentation.json"),
                                          transforms=train_transforms, split="train")
+        sample_weights = self.compute_n_weights(train_dataset.nums)
+
+        sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
         train_dataloader = DataLoader(train_dataset,
                                       batch_size=data_config['batch_size'],
-                                      shuffle=True,
+                                      sampler=sampler,
                                       num_workers=data_config['num_workers'],
                                       pin_memory=True,
                                       drop_last=True)
@@ -52,3 +55,10 @@ class Baseline(Experiment):
                                     drop_last=False)
 
         return train_dataloader, val_dataloader
+
+    def compute_n_weights(self, nums):
+        lic_nums = [len(n) for n in nums]
+        deg = self.config['data']['reweight_deg']
+        weights = [i ** deg for i in lic_nums]
+        return weights
+
