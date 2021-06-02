@@ -116,15 +116,13 @@ class Normalize(object):
 # TODO TIP: Is default image size (256) enough for segmentation of car license plates?
 # TODO TIP: Chances are there's a great lib for complex data augmentations, 'Albumentations' or so...
 # TODO TIP: Keywords to think about: 'class imbalance', 'lack of data'.
-def get_train_transforms(image_size):
+def get_train_transforms(image_size, transform_dict):
+    compose = []
+    for class_name, params in transform_dict.items():
+        t = getattr(A, class_name)(**params)
+        compose.append(t)
     return A.Compose([
-        A.ColorJitter(
-            brightness=(0.7, 1.),
-            contrast=(0.7, 1.),
-            saturation=0.,
-            hue=0.,
-            p=0.5,
-        ),
+        *compose,
         Normalize(),
         Crop(min_size=1 - 1 / 3., min_ratio=1.0, max_ratio=1.0, p=0.5),
         Flip(p=0.05),

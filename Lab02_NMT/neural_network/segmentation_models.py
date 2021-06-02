@@ -8,3 +8,4 @@ SEG_NN_CATALOG: Dict[str, callable] = {}
 
 
 add_to_catalog('baseline', SEG_NN_CATALOG)(smp.Unet)
+add_to_catalog('unet++', SEG_NN_CATALOG)(smp.UnetPlusPlus)

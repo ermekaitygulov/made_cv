@@ -1,13 +1,13 @@
 data_path: '../contest02/data'
 rec_size: [320, 64]
-seg_size: [512, 512]
-seg_threshold: 0.01
+seg_size: [320, 320]
+seg_threshold: 0.1
 min_wh_odd: 1.
 max_wh_odd: 10
-output_file: 512_seg.csv
+output_file: unet++.csv
 seg_model:
-  name: baseline
-  path: model_save/segmentation_3e8bfe5q/Adam_stage-seg_model_best.pt
+  name: unet++
+  path: model_save/segmentation_2ca1qxnp/Adam_stage-seg_model_best.pt
   params:
     encoder_name: resnet34
     encoder_weights: imagenet

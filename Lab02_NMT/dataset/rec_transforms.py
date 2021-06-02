@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import albumentations as A
+from albumentations.pytorch.transforms import ToTensorV2
 
 
 class Compose(object):
@@ -19,18 +21,16 @@ class Rotate(object):
         self.fill_value = fill_value
         self.p = p
 
-    def __call__(self, item):
+    def __call__(self, image, **kwargs):
         if np.random.uniform(0.0, 1.0) > self.p:
-            return item
-        item_ = item.copy()
-        h, w, _ = item_['image'].shape
-        image = item_['image']
+            return {'image': image}
+        h, w, _ = image.shape
         angle = np.random.uniform(-self.max_angle, self.max_angle)
         image = self.rotate_and_scale(image, angle=angle)
-        item_['image'] = image
-        return item_
+        return {'image': image}
 
-    def rotate_and_scale(self, image, scale_factor=1.0, angle=30):
+    @staticmethod
+    def rotate_and_scale(image, scale_factor=1.0, angle=30):
         old_h, old_w = image.shape[:2]
         m = cv2.getRotationMatrix2D(center=(old_w / 2, old_h / 2), angle=angle, scale=scale_factor)
 
@@ -51,9 +51,9 @@ class Resize(object):
     def __init__(self, size=(320, 32)):
         self.size = tuple(size)
 
-    def __call__(self, item):
-        item['image'] = cv2.resize(item['image'], self.size)
-        return item
+    def __call__(self, image, **kwargs):
+        image = cv2.resize(image, self.size)
+        return {'image': image}
 
 
 class Pad(object):
@@ -62,11 +62,9 @@ class Pad(object):
         self.p = p
         self.border_styles = ('replicate', 'zeroes', 'colour')
 
-    def __call__(self, item):
+    def __call__(self, image, **kwargs):
         if np.random.uniform(0.0, 1.0) > self.p:
-            return item
-        item_ = item.copy()
-        image = item_['image'].copy()
+            return {'image': image}
 
         h, w, _ = image.shape
         top = int(np.random.uniform(0, self.max_size) * h)
@@ -80,8 +78,7 @@ class Pad(object):
             value = np.random.uniform(size=(3,)) if border_style == 'colour' else 0.0  # zeroes
             image = cv2.copyMakeBorder(image, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=value)
 
-        item_['image'] = image
-        return item_
+        return {'image': image}
 
 
 class Normalize(object):
@@ -89,22 +86,31 @@ class Normalize(object):
         self.mean = np.asarray(mean).reshape((1, 1, 3)).astype(np.float32)
         self.std = np.asarray(std).reshape((1, 1, 3)).astype(np.float32)
 
-    def __call__(self, item):
-        item["image"] = (item["image"] - self.mean) / self.std
-        return item
+    def __call__(self, image, **kwargs):
+        image = (image - self.mean) / self.std
+        return {'image': image}
 
 
-def get_train_transforms(image_size, augs):
-    return Compose([
+def get_train_transforms(image_size, augs, transform_dict=None):
+    if transform_dict is None:
+        transform_dict = {}
+    compose = []
+    for class_name, params in transform_dict.items():
+        t = getattr(A, class_name)(**params)
+        compose.append(t)
+    return A.Compose([
+        *compose,
         Normalize(),
         Rotate(max_angle=augs * 7.5, p=0.5),
         Pad(max_size=augs / 10, p=0.1),
         Resize(size=image_size),
+        ToTensorV2()
     ])
 
 
 def get_val_transforms(image_size):
-    return Compose([
+    return A.Compose([
         Normalize(),
-        Resize(size=image_size)
+        Resize(size=image_size),
+        ToTensorV2()
     ])

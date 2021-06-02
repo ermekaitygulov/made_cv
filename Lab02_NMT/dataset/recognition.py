@@ -58,11 +58,10 @@ class RecognitionDataset(Dataset):
         text = self.texts[item]
         seq = self.text_to_seq(text)
         seq_len = len(seq)
-        output = dict(image=image, seq=seq, seq_len=seq_len, text=text)
-        
         if self.transforms is not None:
-            output = self.transforms(output)
-            
+            image = self.transforms(image=image)['image']
+
+        output = dict(image=image, seq=seq, seq_len=seq_len, text=text)
         return output
 
     def text_to_seq(self, text):
@@ -75,7 +74,7 @@ class RecognitionDataset(Dataset):
         seqs = list()
         seq_lens = list()
         for sample in batch:
-            images.append(torch.from_numpy(sample["image"].transpose((2, 0, 1))).float())
+            images.append(sample["image"])
             seqs.extend(sample["seq"])
             seq_lens.append(sample["seq_len"])
         images = torch.stack(images)

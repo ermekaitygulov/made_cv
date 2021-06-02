@@ -36,6 +36,9 @@ class RecognitionStage(BaseStage):
 
             val_acc, val_acc_ed = self.val_epoch(val_iterator, epoch)
 
+            if self.lr_scheduler:
+                self.lr_scheduler.step()
+
             if (epoch + 1) % self.config['save_mod'] == 0:
                 self.save_model(f'{self.name}-rec_model{epoch}.pt')
             if val_acc > best_val_acc:
@@ -72,8 +75,6 @@ class RecognitionStage(BaseStage):
 
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
             self.opt.step()
-            if self.lr_scheduler:
-                self.lr_scheduler.step()
             loss_window.append(loss.cpu().detach().numpy())
             if (i + 1) % self.config['log_window_size'] == 0:
                 log_dict = dict()

@@ -41,6 +41,11 @@ def init_model(config, catalog, device):
     return model
 
 
+def brightness_contrast(image, alpha=1.3, beta=0):
+    new_image = np.clip(alpha * image + beta, 0, 255).astype('uint8')
+    return new_image
+
+
 def main(args):
     config = read_config(args.config)
 
@@ -58,7 +63,7 @@ def main(args):
     for i, file_name in enumerate(tqdm.tqdm(files)):
         image_src = cv2.imread(os.path.join(test_images_dirname, file_name))
         image_src = cv2.cvtColor(image_src, cv2.COLOR_BGR2RGB)
-
+        image_src = brightness_contrast(image_src)
         # 1. Segmentation.
         image, k, dw, dh = prepare_for_segmentation(image_src.astype(np.float) / 255.,
                                                     tuple(config['seg_size']))

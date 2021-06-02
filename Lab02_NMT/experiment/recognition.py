@@ -33,7 +33,7 @@ class Baseline(Experiment):
                                       collate_fn=train_dataset.collate_fn)
 
         val_transforms = get_val_transforms(**data_config['val_transforms'])
-        val_dataset = RecognitionDataset(data_path, os.path.join(data_path, "train_recognition.json"),
+        val_dataset = RecognitionDataset(data_path, os.path.join(data_path, "big_rec.json"),
                                          abc=ALPHABET, transforms=val_transforms, split="val")
         val_dataloader = DataLoader(val_dataset,
                                     batch_size=data_config['batch_size'],

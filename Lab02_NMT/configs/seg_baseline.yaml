@@ -1,14 +1,21 @@
 data:
-  reweight_deg: 3
+  reweight_deg: 4
   train_transforms:
     image_size: 320
+    transform_dict:
+      ColorJitter:
+        brightness: [0.7, 1.1]
+        contrast: [0.7, 1.1]
+        saturation: 0.2
+        hue: 0.
+        p: 0.5
   val_transforms:
     image_size: 320
   batch_size: 8
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
-  weight_focal: 0.7
+  weight_focal: 0.5
   focal_gamma: 4
   epoch: 3
   save_mod: 5
@@ -20,7 +27,7 @@ Adam_stage:
     gamma: 0.1
 model:
   freeze_bn: True
-  name: baseline
+  name: unet++
   params:
     encoder_name: resnet34
     encoder_weights: imagenet
