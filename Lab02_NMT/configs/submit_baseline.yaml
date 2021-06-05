@@ -1,13 +1,13 @@
 data_path: '../contest02/data'
 rec_size: [320, 64]
-seg_size: [320, 320]
-seg_threshold: 0.1
+seg_size: [512, 512]
+seg_threshold: 0.2
 min_wh_odd: 1.
 max_wh_odd: 10
-output_file: unet++.csv
+output_file: 512_aug.csv
 seg_model:
-  name: unet++
-  path: model_save/segmentation_2ca1qxnp/Adam_stage-seg_model_best.pt
+  name: baseline
+  path: model_save/segmentation_2mf77sfw/Adam_stage-seg_model_best.pt
   params:
     encoder_name: resnet34
     encoder_weights: imagenet
@@ -16,7 +16,7 @@ seg_model:
     decoder_attention_type: scse
 rec_model:
   name: baseline
-  path: model_save/recognition_2eol4n5p/Adam_stage-rec_model_best.pt
+  path: model_save/recognition_18wbgnxw/Adam_stage-rec_model_best.pt
   params:
     cnn_input_size: [64, 320]
     cnn_output_len: 20

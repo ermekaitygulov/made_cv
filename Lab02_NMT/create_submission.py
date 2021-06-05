@@ -41,7 +41,7 @@ def init_model(config, catalog, device):
     return model
 
 
-def brightness_contrast(image, alpha=1.3, beta=0):
+def brightness_contrast(image, alpha=1., beta=0):
     new_image = np.clip(alpha * image + beta, 0, 255).astype('uint8')
     return new_image
 

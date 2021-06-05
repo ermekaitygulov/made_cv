@@ -3,12 +3,27 @@ data:
     image_size: [320, 64]
     augs: 0
     transform_dict:
+      OpticalDistortion:
+        distort_limit: 1
+        shift_limit: 0.5
+        p: 0.1
+      GridDistortion:
+        num_steps: 5
+        distort_limit: 0.3
+        interpolation: 1
+        border_mode: 4
+        p: 0.1
       ColorJitter:
-        brightness: [0.7, 1.1]
-        contrast: [0.7, 1.1]
-        saturation: 0.2
+        brightness: [ 0.6, 0.8 ]
+        contrast: [ 0.6, 0.8 ]
+        saturation: 0.
         hue: 0.
         p: 0.5
+#      RandomFog:
+#        fog_coef_lower: 0.1
+#        fog_coef_upper: 0.1
+#        alpha_coef: 0.05
+#        p: 0.1
   val_transforms:
     image_size: [320, 64]
   batch_size: 64

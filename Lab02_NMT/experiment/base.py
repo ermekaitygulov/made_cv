@@ -2,6 +2,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Type, Dict
 
+import torch
+
 from utils import Task
 
 ABC_NN_CATALOG = {}
@@ -32,7 +34,9 @@ class Experiment(ABC):
         model = model_class(**model_config['params'])
 
         if 'model_path' in self.config:
-            model.load(self.config['model_path'])
+            with open(self.config['model_path'], "rb") as fp:
+                state_dict = torch.load(fp, map_location='cpu')
+                model.load_state_dict(state_dict)
         model.to(self.device)
         return model
 

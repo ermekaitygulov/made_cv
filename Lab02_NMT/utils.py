@@ -79,7 +79,7 @@ def convert_to_eng(text, mapping=None):
 
 
 def dice_coeff(input, target):
-    smooth = 1.
+    smooth = 0.1
 
     input_flat = input.view(-1)
     target_flat = target.view(-1)

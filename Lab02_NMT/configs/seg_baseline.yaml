@@ -1,21 +1,41 @@
 data:
   reweight_deg: 4
   train_transforms:
-    image_size: 320
+    image_size: 512
     transform_dict:
+#      OpticalDistortion:
+#        distort_limit: 1
+#        shift_limit: 0.5
+#        p: 0.1
+#      GridDistortion:
+#        num_steps: 5
+#        distort_limit: 0.3
+#        interpolation: 1
+#        border_mode: 4
+#        p: 0.1
+#      RGBShift:
+#        r_shift_limit: 5
+#        g_shift_limit: 5
+#        b_shift_limit: 5
+#        p: 0.1
       ColorJitter:
-        brightness: [0.7, 1.1]
-        contrast: [0.7, 1.1]
-        saturation: 0.2
+        brightness: [0.5, 0.9]
+        contrast: [0.5, 0.9]
+        saturation: 0.
         hue: 0.
         p: 0.5
+      RandomFog:
+        fog_coef_lower: 0.1
+        fog_coef_upper: 0.5
+        alpha_coef: 0.08
+        p: 0.1
   val_transforms:
     image_size: 320
   batch_size: 8
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
-  weight_focal: 0.5
+  weight_focal: 0.8
   focal_gamma: 4
   epoch: 3
   save_mod: 5
@@ -27,7 +47,7 @@ Adam_stage:
     gamma: 0.1
 model:
   freeze_bn: True
-  name: unet++
+  name: baseline
   params:
     encoder_name: resnet34
     encoder_weights: imagenet
