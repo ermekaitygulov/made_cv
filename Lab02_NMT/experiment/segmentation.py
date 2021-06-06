@@ -32,7 +32,7 @@ class Baseline(Experiment):
         data_path = data_config['path']
 
         train_transforms = get_train_transforms(**data_config['train_transforms'])
-        train_dataset = DetectionDataset(data_path, os.path.join(data_path, "train_segmentation_aug.json"),
+        train_dataset = DetectionDataset(data_path, os.path.join(data_path, "train_segmentation.json"),
                                          transforms=train_transforms, split="train")
         sample_weights = self.compute_n_weights(train_dataset.nums)
 
@@ -45,7 +45,7 @@ class Baseline(Experiment):
                                       drop_last=True)
 
         val_transforms = get_val_transforms(**data_config['val_transforms'])
-        val_dataset = DetectionDataset(data_path, os.path.join(data_path, "train_segmentation_aug.json"),
+        val_dataset = DetectionDataset(data_path, os.path.join(data_path, "train_segmentation.json"),
                                        transforms=val_transforms, split="val")
         val_dataloader = DataLoader(val_dataset,
                                     batch_size=data_config['batch_size'],
