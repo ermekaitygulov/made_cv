@@ -1,21 +1,21 @@
 data:
   train_transforms:
     image_size: [320, 64]
-    augs: 0
+    augs: 0.8
     transform_dict:
-      OpticalDistortion:
-        distort_limit: 1
-        shift_limit: 0.5
-        p: 0.1
       GridDistortion:
         num_steps: 5
         distort_limit: 0.3
         interpolation: 1
         border_mode: 4
         p: 0.1
+      OpticalDistortion:
+        distort_limit: 0.2
+        shift_limit: 0.2
+        p: 0.1
       ColorJitter:
-        brightness: [ 0.6, 0.8 ]
-        contrast: [ 0.6, 0.8 ]
+        brightness: [ 0.6, 1.1 ]
+        contrast: [ 0.6, 1.1 ]
         saturation: 0.
         hue: 0.
         p: 0.5
@@ -43,7 +43,7 @@ model:
   params:
     cnn_input_size: [64, 320]
     cnn_output_len: 20
-    rnn_hidden_size: 128
+    rnn_hidden_size: 256
     rnn_num_layers: 1
-    rnn_dropout: 0.0
-    rnn_bidirectional: False
+    rnn_dropout: 0.2
+    rnn_bidirectional: True

@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 from inference_utils import order_pts, compute_max_wh
 
-TRAIN_SIZE = 0.8
+TRAIN_SIZE = 0.9
 
 
 class DetectionDataset(Dataset):

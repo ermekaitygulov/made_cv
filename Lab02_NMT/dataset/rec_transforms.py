@@ -101,8 +101,8 @@ def get_train_transforms(image_size, augs, transform_dict=None):
     return A.Compose([
         *compose,
         Normalize(),
-        Rotate(max_angle=augs * 7.5, p=0.5),
-        Pad(max_size=augs / 10, p=0.1),
+        Rotate(max_angle=augs * 7.5, p=0.1),
+        # Pad(max_size=augs / 10, p=0.1),
         Resize(size=image_size),
         ToTensorV2()
     ])

@@ -15,8 +15,8 @@ data:
 #        b_shift_limit: 5
 #        p: 0.1
       ColorJitter:
-        brightness: [0.5, 0.9]
-        contrast: [0.5, 0.9]
+        brightness: [ 0.5, 1. ]
+        contrast: [ 0.5, 1. ]
         saturation: 0.
         hue: 0.
         p: 0.5
@@ -26,14 +26,14 @@ data:
         alpha_coef: 0.08
         p: 0.1
   val_transforms:
-    image_size: 320
+    image_size: 512
   batch_size: 8
   path: '../contest02/data'
   num_workers: 8
 Adam_stage:
   weight_focal: 0.8
   focal_gamma: 4
-  epoch: 3
+  epoch: 2
   save_mod: 5
   log_window_size: 10
   opt_class: Adam

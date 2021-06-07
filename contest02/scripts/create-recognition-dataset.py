@@ -66,7 +66,7 @@ def add_noise(image, box, noise):
     return box
 
 
-def warp_perspective(image, box, noise=0.05):
+def warp_perspective(image, box, noise=0.1):
     box = order_pts(box)
     box = add_noise(image, box, noise)
 
